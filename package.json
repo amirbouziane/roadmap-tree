@@ -21,6 +21,6 @@
     "files": ["index.html", "styles.css", "app.js", "roadmap.json", "desktop/**"],
     "win": { "target": "nsis" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "publish": [{ "provider": "github", "owner": "amirbouziane", "repo": "roadmap-tree" }]
+    "publish": [{ "provider": "github", "owner": "amirbouziane", "repo": "roadmap-tree", "releaseType": "release" }]
   }
 }
