@@ -468,6 +468,8 @@ function update() {
     ? render(tree, { collapsed: state.collapsed, running: state.timer && state.timer.nodeId, spent: spentByNode(tree) })
     : '';
 
+  $('emptyState').hidden = tree.nodes.length > 0 || !$('loadError').hidden;
+
   // Tabs: only the active view is shown; tree-only buttons hide on the calendar.
   const cal = state.tab === 'calendar';
   $('treeWrap').hidden = cal;
@@ -799,6 +801,36 @@ function bindEvents() {
   $('saveBtn').onclick = save;
   $('openBtn').onclick = openFile;
   $('discardBtn').onclick = discard;
+
+  // Add a top-level item (the per-row "+" only adds children).
+  $('addRoot').onclick = () => {
+    const node = { id: newId(state.tree), label: 'New item', status: 'planned' };
+    commit((t) => { t.nodes.push(node); });
+    startRename(node.id, true);
+  };
+
+  // Double-click the title to rename the roadmap; Enter or blur saves, Esc cancels.
+  $('title').addEventListener('dblclick', () => {
+    const el = $('title');
+    const before = state.tree.title;
+    el.contentEditable = 'true';
+    el.focus();
+    getSelection().selectAllChildren(el);
+    const finish = (keep) => {
+      el.removeEventListener('blur', onBlur);
+      el.removeEventListener('keydown', onKey);
+      el.contentEditable = 'false';
+      const v = el.textContent.trim();
+      if (keep && v && v !== before) commit((t) => { t.title = v; }); else update();
+    };
+    const onBlur = () => finish(true);
+    const onKey = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') finish(false);
+    };
+    el.addEventListener('blur', onBlur);
+    el.addEventListener('keydown', onKey);
+  });
 
   // Tabs, timer chip, calendar navigation.
   document.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });

@@ -3,7 +3,7 @@
  * Serves the app files from a tiny loopback-only HTTP server so the page
  * behaves exactly as it does in a browser (fetch, localStorage). The data
  * file lives in the user's app-data folder, not inside the installed app:
- *   GET /roadmap.json  -> that file (seeded from the bundled copy on first run)
+ *   GET /roadmap.json  -> that file (created empty on first run)
  *   PUT /roadmap.json  -> overwrite it (used by the Save button)
  */
 'use strict';
@@ -20,10 +20,12 @@ const STATIC = new Set(['index.html', 'styles.css', 'app.js']);
 
 let dataFile;
 
-/** Copy the bundled roadmap.json into app-data the first time. */
+/** First run: start with an empty roadmap (the bundled roadmap.json is only a dev sample). */
 function ensureDataFile() {
   dataFile = path.join(app.getPath('userData'), 'roadmap.json');
-  if (!fs.existsSync(dataFile)) fs.copyFileSync(path.join(ROOT, 'roadmap.json'), dataFile);
+  if (!fs.existsSync(dataFile)) {
+    fs.writeFileSync(dataFile, JSON.stringify({ title: 'My roadmap', nodes: [], log: [] }, null, 2) + '\n');
+  }
 }
 
 function startServer() {
