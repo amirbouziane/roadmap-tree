@@ -3,7 +3,7 @@
  * Serves the app files from a tiny loopback-only HTTP server so the page
  * behaves exactly as it does in a browser (fetch, localStorage). The data
  * file lives in the user's app-data folder, not inside the installed app:
- *   GET /roadmap.json  -> that file (created empty on first run)
+ *   GET /roadmap.json  -> that file (example tree on first run)
  *   PUT /roadmap.json  -> overwrite it (used by the Save button)
  */
 'use strict';
@@ -20,12 +20,32 @@ const STATIC = new Set(['index.html', 'styles.css', 'app.js']);
 
 let dataFile;
 
-/** First run: start with an empty roadmap (the bundled roadmap.json is only a dev sample). */
+/** A small generic tree shown on first run so new users see how it works. */
+const EXAMPLE = {
+  title: 'My roadmap',
+  nodes: [
+    {
+      id: 'ex', label: 'Example project', note: 'delete me',
+      children: [
+        { id: 'ex1', label: 'Plan', status: 'done', children: [
+          { id: 'ex1a', label: 'Write down the goals', status: 'done' },
+          { id: 'ex1b', label: 'Pick the tools', status: 'done' },
+        ] },
+        { id: 'ex2', label: 'Build', status: 'active', note: 'click the dot to change status', children: [
+          { id: 'ex2a', label: 'First prototype', status: 'active', note: 'hover a row and press ▶ to time it' },
+          { id: 'ex2b', label: 'Polish', status: 'planned' },
+        ] },
+        { id: 'ex3', label: 'Launch', status: 'planned', note: 'hover a row for + and ×' },
+      ],
+    },
+  ],
+  log: [],
+};
+
+/** First run: write the example tree (the bundled roadmap.json is only a dev sample). */
 function ensureDataFile() {
   dataFile = path.join(app.getPath('userData'), 'roadmap.json');
-  if (!fs.existsSync(dataFile)) {
-    fs.writeFileSync(dataFile, JSON.stringify({ title: 'My roadmap', nodes: [], log: [] }, null, 2) + '\n');
-  }
+  if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify(EXAMPLE, null, 2) + '\n');
 }
 
 function startServer() {

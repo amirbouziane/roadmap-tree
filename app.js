@@ -75,7 +75,10 @@ function progress(tree) {
  */
 function whatsNext(tree, limit = 5) {
   const active = [];
-  walk(tree.nodes, (n, _d, _p, path) => { if (n.status === 'active') active.push({ node: n, path }); });
+  const hasActiveBelow = (n) => hasKids(n) && n.children.some((c) => c.status === 'active' || hasActiveBelow(c));
+  walk(tree.nodes, (n, _d, _p, path) => {
+    if (n.status === 'active' && !hasActiveBelow(n)) active.push({ node: n, path });
+  });
   const planned = leaves(tree).filter((l) => statusOf(l.node) === 'planned').slice(0, limit);
   return { active, planned };
 }
