@@ -257,6 +257,74 @@ button.primary.dirty { border-color: var(--green); color: var(--green); }
 
 .rt-node.flash .rt-row { fill: color-mix(in srgb, var(--green) 14%, transparent); }
 
+/* ---------- step notes (Markdown + LaTeX) ---------- */
+
+.rt-node.selected .rt-row { fill: color-mix(in srgb, var(--fg) 7%, transparent); }
+.rt-hasnote { fill: var(--muted); font-size: 12px; }
+
+.layout.has-note .tree-wrap { flex: 0 1 42%; min-width: 300px; }
+
+.note-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+}
+
+.note-head { display: flex; align-items: flex-start; gap: 12px; padding: 16px 24px 12px; border-bottom: 1px solid var(--border); }
+.note-titles { flex: 1; min-width: 0; }
+.note-head h2 { margin: 0; font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-crumb { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.note-tools { display: flex; gap: 6px; }
+
+/* Editing: editor above the preview; side by side only on very wide windows. */
+.note-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+@media (min-width: 1600px) { .note-pane.editing .note-body { flex-direction: row; } }
+
+.layout.has-note .next { width: 250px; }
+
+.note-body textarea {
+  display: none;
+  flex: 1 1 45%;
+  min-height: 0;
+  min-width: 0;
+  resize: none;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  padding: 20px 24px;
+  font: 13px/1.6 ui-monospace, "Cascadia Code", Consolas, monospace;
+  outline: none;
+}
+.note-pane.editing textarea { display: block; }
+
+.md { flex: 1 1 55%; min-width: 0; min-height: 0; overflow: auto; padding: 20px 28px 48px; line-height: 1.65; }
+.md > :first-child { margin-top: 0; }
+.md h1, .md h2, .md h3, .md h4 { line-height: 1.3; margin: 1.4em 0 0.5em; }
+.md h1 { font-size: 22px; } .md h2 { font-size: 18px; } .md h3 { font-size: 15px; } .md h4 { font-size: 14px; }
+.md p, .md ul, .md ol, .md blockquote, .md pre, .md table { margin: 0 0 0.9em; }
+.md ul, .md ol { padding-left: 1.5em; }
+.md li > input[type="checkbox"] { margin-right: 6px; }
+.md a { color: var(--green); }
+.md code { font: 12.5px ui-monospace, "Cascadia Code", Consolas, monospace; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
+.md pre { background: var(--hover); padding: 12px 14px; border-radius: 6px; overflow: auto; }
+.md pre code { background: none; padding: 0; }
+.md blockquote { margin-left: 0; padding-left: 14px; border-left: 2px solid var(--border); color: var(--muted); }
+.md hr { border: 0; border-top: 1px solid var(--border); margin: 1.4em 0; }
+.md table { border-collapse: collapse; }
+.md th, .md td { border: 1px solid var(--border); padding: 4px 10px; }
+.md img { max-width: 100%; }
+.md .none { color: var(--muted); }
+.md .katex-display { margin: 0.9em 0; overflow-x: auto; overflow-y: hidden; }
+
+@media (max-width: 760px) {
+  .layout.has-note .tree-wrap { flex: none; max-height: 40vh; }
+  .layout.has-note .next { width: auto; }
+  .note-pane { border-left: 0; border-top: 1px solid var(--border); min-height: 50vh; }
+}
+
 /* drag to reorder */
 .rt-act.grip { cursor: grab; }
 body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select: none; }

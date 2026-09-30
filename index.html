@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>roadmap-tree</title>
+  <link rel="stylesheet" href="vendor/katex.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -42,7 +43,7 @@
     </div>
   </header>
 
-  <main class="layout">
+  <main class="layout" id="mainLayout">
     <section class="tree-wrap" id="treeWrap" aria-label="Roadmap tree">
       <div id="tree"></div>
       <p class="empty" id="emptyState" hidden>
@@ -54,6 +55,24 @@
         Couldn't load <code>roadmap.json</code>. Serve this folder over HTTP
         (see README) or use <strong>Open…</strong> to pick the file.
       </p>
+    </section>
+
+    <section class="note-pane" id="notePane" aria-label="Step notes" hidden>
+      <header class="note-head">
+        <div class="note-titles">
+          <h2 id="noteTitle"></h2>
+          <div class="note-crumb" id="noteCrumb"></div>
+        </div>
+        <div class="note-tools">
+          <button type="button" id="noteEdit">Edit</button>
+          <button type="button" id="noteClose" aria-label="Close notes" title="Close">×</button>
+        </div>
+      </header>
+      <div class="note-body">
+        <textarea id="noteText" spellcheck="true"
+          placeholder="Write notes in Markdown.&#10;Math works like Obsidian: $E = mc^2$ inline, or $$ ... $$ for a block."></textarea>
+        <article class="md" id="noteView"></article>
+      </div>
     </section>
 
     <section class="cal-wrap" id="calWrap" aria-label="Time calendar" hidden>
@@ -78,6 +97,10 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="vendor/katex.min.js"></script>
+  <script src="markdown.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -314,7 +314,7 @@ function render(tree, view = {}) {
     const n = r.node;
     const isRunning = view.running === n.id;
     const spentMs = view.spent ? view.spent.get(n.id) || 0 : 0;
-    const cls = `rt-node s-${r.status}${r.kids ? ' has-kids' : ''}${isRunning ? ' running' : ''}`;
+    const cls = `rt-node s-${r.status}${r.kids ? ' has-kids' : ''}${isRunning ? ' running' : ''}${view.selected === n.id ? ' selected' : ''}`;
     const tx = r.x + L.textGap;
     const cx = r.x + L.chevGap;
     let g = `<g class="${cls}" data-id="${esc(n.id)}">`;
@@ -328,6 +328,7 @@ function render(tree, view = {}) {
     }
     g += `<text class="rt-text" x="${tx}" y="${r.y}" dy="0.35em">`;
     g += `<tspan class="rt-label" data-action="label">${esc(n.label || '(untitled)')}</tspan>`;
+    if (n.md) g += `<tspan class="rt-hasnote" dx="8"><title>Has notes</title>¶</tspan>`;
     if (n.note) g += `<tspan class="rt-note" dx="10">${esc(n.note)}</tspan>`;
     if (spentMs >= MIN / 2) g += `<tspan class="rt-note rt-spent" dx="10">${fmtDur(spentMs)}</tspan>`;
     g += `<tspan class="rt-act grip" data-action="grip" dx="12"><title>Drag to move</title>≡</tspan>`;
@@ -439,6 +440,8 @@ const state = {
   fileHandle: null, // File System Access handle, once the user opens/saves a file
   timer: null,      // running timer: { nodeId, label, start }; survives reloads via localStorage
   tab: 'tree',      // 'tree' | 'calendar'
+  selected: null,   // id of the step whose notes are open
+  noteMode: 'view', // 'view' | 'edit'
   cal: { year: now.getFullYear(), month: now.getMonth(), selected: dayKey(now) },
 };
 
@@ -494,7 +497,7 @@ function update() {
   $('title').textContent = tree.title;
 
   $('tree').innerHTML = tree.nodes.length
-    ? render(tree, { collapsed: state.collapsed, running: state.timer && state.timer.nodeId, spent: spentByNode(tree) })
+    ? render(tree, { collapsed: state.collapsed, running: state.timer && state.timer.nodeId, spent: spentByNode(tree), selected: state.selected })
     : '';
 
   $('emptyState').hidden = tree.nodes.length > 0 || !$('loadError').hidden;
@@ -513,10 +516,66 @@ function update() {
   $('progressText').textContent = `${p.done} / ${p.total} done · ${p.pct}%`;
 
   renderNext(tree);
+  renderNotePane();
+  updateSaveState();
+}
 
+/** Save button shows a dot (and Discard appears) while there are unsaved changes. */
+function updateSaveState() {
   $('saveBtn').classList.toggle('dirty', state.dirty);
   $('saveBtn').textContent = state.dirty ? 'Save •' : 'Save';
   $('discardBtn').hidden = !state.dirty;
+}
+
+/* ---- step notes ---- */
+
+/** Open (or keep open) the notes of a step. A step without notes opens in edit mode. */
+function selectNode(id) {
+  if (state.selected === id) return;
+  const hit = findNode(state.tree, id);
+  if (!hit) return;
+  state.selected = id;
+  state.noteMode = hit.node.md ? 'view' : 'edit';
+  update();
+  if (state.noteMode === 'edit') $('noteText').focus();
+}
+
+function closeNote() {
+  state.selected = null;
+  update();
+}
+
+/** Show/hide the notes pane for the selected step and sync its contents. */
+function renderNotePane() {
+  const hit = state.selected ? findNode(state.tree, state.selected) : null;
+  if (!hit) state.selected = null; // the step was deleted or the tree was replaced
+  const show = !!hit && state.tab === 'tree';
+  $('notePane').hidden = !show;
+  $('mainLayout').classList.toggle('has-note', show);
+  if (!show) return;
+
+  let crumb = '';
+  walk(state.tree.nodes, (n, _d, _p, path) => { if (n.id === hit.node.id) crumb = path.join(' / '); });
+  $('noteTitle').textContent = hit.node.label || '(untitled)';
+  $('noteCrumb').textContent = crumb;
+
+  const editing = state.noteMode === 'edit';
+  $('notePane').classList.toggle('editing', editing);
+  $('noteEdit').textContent = editing ? 'Done' : 'Edit';
+
+  // Don't overwrite what the user is typing; otherwise load the step's text.
+  const ta = $('noteText');
+  if (document.activeElement !== ta) ta.value = hit.node.md || '';
+  drawNotePreview(hit.node);
+}
+
+/** Render the step's Markdown (and LaTeX) into the preview. */
+function drawNotePreview(node) {
+  const view = $('noteView');
+  view.innerHTML = node.md
+    ? renderMarkdown(node.md)
+    : '<p class="none">No notes yet. Click <strong>Edit</strong> to write some. Markdown and LaTeX are supported, e.g. <code>$E = mc^2$</code>.</p>';
+  view.querySelectorAll('a[href]').forEach((a) => { a.target = '_blank'; a.rel = 'noopener noreferrer'; });
 }
 
 /** Redraw the calendar grid, month header and selected-day detail. */
@@ -602,9 +661,14 @@ function renderNext(tree) {
 /** Apply a data change: mutate, mark dirty, keep a draft, re-render. */
 function commit(mutate) {
   mutate(state.tree);
+  markDirty();
+  update();
+}
+
+/** Flag unsaved changes and keep the draft in localStorage. */
+function markDirty() {
   state.dirty = true;
   store.set(DRAFT_KEY, JSON.stringify(state.tree));
-  update();
 }
 
 function saveView() {
@@ -661,10 +725,9 @@ function onTreeClick(e) {
       break;
     }
     case 'label':
-      // Delay so a double-click (rename) doesn't also toggle.
-      if (!hasKids(hit.node)) return;
+      // Click opens the step's notes. Delayed so a double-click (rename) doesn't also open them.
       clearTimeout(labelClickTimer);
-      labelClickTimer = setTimeout(() => toggleBranch(id), 230);
+      labelClickTimer = setTimeout(() => selectNode(id), 230);
       break;
     case 'add': {
       const child = { id: newId(state.tree), label: 'New item', status: 'planned' };
@@ -679,6 +742,7 @@ function onTreeClick(e) {
       const extra = hasKids(n) ? ' and everything under it' : '';
       if (!confirm(`Delete "${n.label}"${extra}?`)) return;
       if (state.timer && state.timer.nodeId === id) stopTimer();
+      if (state.selected && containsId(n, state.selected)) state.selected = null;
       commit(() => { hit.siblings.splice(hit.siblings.indexOf(n), 1); });
       break;
     }
@@ -689,18 +753,26 @@ function onTreeClick(e) {
  * Drag a step by its ≡ handle. Dropping on the top/bottom edge of another
  * row puts it before/after that row; dropping on the middle makes it a child.
  */
-function startDrag(e, srcId) {
-  e.preventDefault();
+function startDrag(e, srcId, immediate) {
   const wrap = $('treeWrap');
   const srcNode = findNode(state.tree, srcId).node;
   const srcG = wrap.querySelector(`.rt-node[data-id="${CSS.escape(srcId)}"]`);
-  const ind = document.createElement('div');
-  ind.className = 'drop-ind';
-  ind.hidden = true;
-  wrap.appendChild(ind);
-  srcG.classList.add('dragging');
-  document.body.classList.add('is-dragging');
+  const x0 = e.clientX;
+  const y0 = e.clientY;
+  let ind = null;
+  let active = false; // false until the pointer has moved enough to count as a drag
   let drop = null;
+
+  const begin = () => {
+    active = true;
+    ind = document.createElement('div');
+    ind.className = 'drop-ind';
+    ind.hidden = true;
+    wrap.appendChild(ind);
+    srcG.classList.add('dragging');
+    document.body.classList.add('is-dragging');
+  };
+  if (immediate) { e.preventDefault(); begin(); }
 
   const targetAt = (ev) => {
     for (const g of wrap.querySelectorAll('.rt-node')) {
@@ -714,6 +786,10 @@ function startDrag(e, srcId) {
   };
 
   const onMove = (ev) => {
+    if (!active) {
+      if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return; // still just a click
+      begin();
+    }
     const wr = wrap.getBoundingClientRect();
     if (ev.clientY < wr.top + 30) wrap.scrollTop -= 12; // scroll while dragging near the edges
     else if (ev.clientY > wr.bottom - 30) wrap.scrollTop += 12;
@@ -733,9 +809,14 @@ function startDrag(e, srcId) {
     document.removeEventListener('pointermove', onMove);
     document.removeEventListener('pointerup', onUp);
     document.removeEventListener('keydown', onKey);
+    if (!active) return; // never moved: let the click through
     ind.remove();
     srcG.classList.remove('dragging');
     document.body.classList.remove('is-dragging');
+    // Swallow the click the browser fires after the drop so it doesn't toggle or open anything.
+    const swallow = (ev) => ev.stopPropagation();
+    document.addEventListener('click', swallow, true);
+    setTimeout(() => document.removeEventListener('click', swallow, true), 60);
     if (!keep || !drop) return;
     const { id, pos } = drop;
     if (pos === 'inside') { state.collapsed.delete(id); saveView(); }
@@ -914,10 +995,36 @@ function bindEvents() {
   const tree = $('tree');
   tree.addEventListener('click', onTreeClick);
   tree.addEventListener('dblclick', onTreeDblClick);
+  // Drag a step from anywhere on its row (press and move a few pixels), or from the ≡ handle.
   tree.addEventListener('pointerdown', (e) => {
-    const grip = e.target.closest('[data-action="grip"]');
     const g = e.target.closest('.rt-node');
-    if (grip && g && e.button === 0) startDrag(e, g.dataset.id);
+    if (!g || e.button !== 0) return;
+    const action = (e.target.closest('[data-action]') || {}).dataset?.action;
+    if (action === 'grip') return startDrag(e, g.dataset.id, true);
+    if (['timer', 'add', 'delete', 'up', 'down', 'toggle'].includes(action)) return;
+    startDrag(e, g.dataset.id, false);
+  });
+
+  // Notes pane: Edit/Done toggle, close, and live preview while typing.
+  $('noteEdit').onclick = () => {
+    state.noteMode = state.noteMode === 'edit' ? 'view' : 'edit';
+    update();
+    if (state.noteMode === 'edit') $('noteText').focus();
+  };
+  $('noteClose').onclick = closeNote;
+  let previewTimer = null;
+  $('noteText').addEventListener('input', () => {
+    const hit = findNode(state.tree, state.selected);
+    if (!hit) return;
+    const v = $('noteText').value;
+    if (v.trim()) hit.node.md = v; else delete hit.node.md;
+    markDirty();
+    updateSaveState();
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(() => drawNotePreview(hit.node), 120);
+  });
+  $('noteText').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { state.noteMode = 'view'; update(); }
   });
 
   $('expandAll').onclick = () => { state.collapsed.clear(); saveView(); update(); };
