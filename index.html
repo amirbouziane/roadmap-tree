@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>roadmap-tree</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="title">roadmap-tree</h1>
+    <div class="progress" title="Share of leaf items marked done">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <span class="progress-text" id="progressText"></span>
+    </div>
+    <div class="actions">
+      <button type="button" id="expandAll">Expand all</button>
+      <button type="button" id="collapseAll">Collapse all</button>
+      <span class="sep"></span>
+      <button type="button" id="openBtn" title="Open a roadmap.json file">Open…</button>
+      <button type="button" id="discardBtn" hidden title="Drop unsaved changes and reload from disk">Discard</button>
+      <button type="button" id="saveBtn" class="primary" title="Save roadmap.json (Ctrl+S)">Save</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="tree-wrap" id="treeWrap" aria-label="Roadmap tree">
+      <div id="tree"></div>
+      <p class="empty" id="loadError" hidden>
+        Couldn't load <code>roadmap.json</code>. Serve this folder over HTTP
+        (see README) or use <strong>Open…</strong> to pick the file.
+      </p>
+    </section>
+
+    <aside class="next" aria-label="What's next">
+      <h2>What's next</h2>
+      <div id="nextList"></div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

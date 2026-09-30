@@ -1,0 +1,272 @@
+/* roadmap-tree — flat, quiet, follows the system colour scheme. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #8b949e;
+  --line: #b8bfc7;
+  --border: #e6e8eb;
+  --hover: rgba(31, 35, 40, 0.04);
+  --green: #2da44e;
+  --planned: #a3aab3;
+  --track: #eef0f2;
+  --btn-bg: #ffffff;
+  --btn-hover: #f4f5f7;
+  --danger: #cf222e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --fg: #e3e6ea;
+    --muted: #7d8590;
+    --line: #444c56;
+    --border: #262b32;
+    --hover: rgba(255, 255, 255, 0.04);
+    --green: #3fb950;
+    --planned: #6e7681;
+    --track: #21262d;
+    --btn-bg: #0f1115;
+    --btn-hover: #1a1e24;
+    --danger: #f85149;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 200px;
+  max-width: 420px;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--track);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  transition: width 0.25s ease;
+}
+
+.progress-text {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.sep { width: 1px; height: 18px; background: var(--border); margin: 0 6px; }
+
+button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--btn-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button:hover { background: var(--btn-hover); }
+button.primary.dirty { border-color: var(--green); color: var(--green); }
+
+/* ---------- layout ---------- */
+
+.layout {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.tree-wrap {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  padding: 16px 16px 48px;
+}
+
+.next {
+  width: 300px;
+  flex: none;
+  border-left: 1px solid var(--border);
+  padding: 20px 20px;
+  overflow: auto;
+}
+
+.next h2 {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.next h3 {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.next ul { list-style: none; margin: 0; padding: 0; }
+
+.next li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.next li:hover { background: var(--hover); }
+
+.next .mini-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transform: translateY(-1px);
+}
+.next .mini-dot.s-active { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 25%, transparent); }
+.next .mini-dot.s-planned { border: 1px solid var(--planned); }
+
+.next .crumb { display: block; color: var(--muted); font-size: 12px; }
+.next .none { color: var(--muted); font-size: 13px; margin: 0; }
+
+@media (max-width: 760px) {
+  .layout { flex-direction: column; }
+  .next { width: auto; border-left: 0; border-top: 1px solid var(--border); }
+}
+
+.empty { color: var(--muted); max-width: 440px; }
+
+/* ---------- tree (SVG classes produced by render()) ---------- */
+
+.rt-svg { display: block; overflow: visible; user-select: none; }
+
+.rt-line { stroke: var(--line); stroke-width: 0.5; fill: none; }
+
+.rt-row { fill: transparent; }
+.rt-node:hover .rt-row { fill: var(--hover); }
+
+.rt-hit { fill: transparent; cursor: pointer; }
+
+.rt-dot { stroke-width: 1; }
+.s-done .rt-dot { fill: var(--green); stroke: var(--green); }
+.s-active .rt-dot { fill: var(--green); stroke: var(--green); }
+.s-planned .rt-dot { fill: var(--bg); stroke: var(--planned); }
+
+.rt-pulse {
+  fill: var(--green);
+  opacity: 0.35;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rt-pulse 2s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes rt-pulse {
+  0%   { transform: scale(1);   opacity: 0.45; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-pulse { animation: none; transform: scale(1.9); opacity: 0.2; }
+  .progress-fill { transition: none; }
+}
+
+.rt-chev { stroke: var(--muted); stroke-width: 1.2; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.rt-chev-hit { fill: transparent; cursor: pointer; }
+
+.rt-text { font-size: 14px; fill: var(--fg); }
+.rt-label { cursor: default; }
+.rt-node.has-kids .rt-label { cursor: pointer; }
+.s-done .rt-label { fill: var(--fg); }
+.rt-note { fill: var(--muted); font-size: 12px; }
+
+.rt-act { visibility: hidden; fill: var(--muted); font-size: 15px; cursor: pointer; }
+.rt-node:hover .rt-act { visibility: visible; }
+.rt-act:hover { fill: var(--fg); }
+.rt-act.del:hover { fill: var(--danger); }
+
+.rt-node.flash .rt-row { fill: color-mix(in srgb, var(--green) 14%, transparent); }
+
+/* inline rename box */
+.rename {
+  position: absolute;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--green);
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -2px 0 0 -5px;
+  outline: none;
+  min-width: 160px;
+}
+
+/* ---------- toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.toast.show { opacity: 1; }

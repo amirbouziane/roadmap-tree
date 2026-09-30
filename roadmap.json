@@ -1,0 +1,39 @@
+{
+  "title": "SDR course",
+  "nodes": [
+    {
+      "id": "rx",
+      "label": "Receiver side",
+      "children": [
+        {
+          "id": "m01",
+          "label": "01 IQ samples",
+          "status": "done",
+          "note": "Ch 7",
+          "children": [
+            { "id": "s11", "label": "1.1 Passband signals", "status": "done" },
+            { "id": "s12", "label": "1.2 Mixing down to baseband", "status": "done" },
+            { "id": "s13", "label": "1.3 In-phase and quadrature", "status": "done" },
+            { "id": "s14", "label": "1.4 Complex baseband", "status": "done" },
+            { "id": "s15", "label": "1.5 Negative frequencies", "status": "done" },
+            { "id": "s16", "label": "1.6 IQ imbalance and DC offset", "status": "done" },
+            { "id": "s17", "label": "1.7 Recording IQ files", "status": "done" }
+          ]
+        },
+        { "id": "m02", "label": "02 Sampling", "status": "planned", "note": "measure.py" },
+        { "id": "m03", "label": "03 Spectrum", "status": "planned", "note": "spectrum.py" },
+        { "id": "m04", "label": "04 Filtering", "status": "planned" },
+        { "id": "m05", "label": "05 Tuning and decimation", "status": "planned" },
+        { "id": "m06", "label": "06 Analog demodulation", "status": "planned" },
+        { "id": "m07", "label": "07 Digital modulation", "status": "planned" },
+        { "id": "m08", "label": "08 Synchronization", "status": "planned" }
+      ]
+    },
+    {
+      "id": "tx",
+      "label": "Transmission side",
+      "status": "planned",
+      "children": []
+    }
+  ]
+}
