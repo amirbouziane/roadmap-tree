@@ -1,0 +1,26 @@
+{
+  "name": "roadmap-tree",
+  "version": "0.2.0",
+  "description": "Local interactive progress tree with a time-tracking calendar",
+  "author": "Amir Bouziane",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.0"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "local.roadmaptree.app",
+    "productName": "Roadmap Tree",
+    "files": ["index.html", "styles.css", "app.js", "roadmap.json", "desktop/**"],
+    "win": { "target": "nsis" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "publish": [{ "provider": "github", "owner": "amirbouziane", "repo": "roadmap-tree" }]
+  }
+}

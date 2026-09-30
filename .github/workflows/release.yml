@@ -1,0 +1,28 @@
+name: Release
+
+# Push a tag like v0.2.1 and this builds the Windows installer on GitHub's
+# servers and attaches it to a GitHub Release. Installed apps pick it up
+# automatically (see desktop/main.js).
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Use the tag as the app version
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+      - run: npm install
+      - name: Build and publish installer
+        run: npx electron-builder --win nsis --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

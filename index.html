@@ -14,9 +14,21 @@
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
       <span class="progress-text" id="progressText"></span>
     </div>
+    <nav class="tabs" aria-label="View">
+      <button type="button" data-tab="tree" class="on">Tree</button>
+      <button type="button" data-tab="calendar">Calendar</button>
+    </nav>
+    <div class="timer" id="timerChip" hidden>
+      <span class="timer-dot"></span>
+      <span id="timerLabel"></span>
+      <span id="timerClock" class="timer-clock"></span>
+      <button type="button" id="timerStop">Stop</button>
+    </div>
     <div class="actions">
-      <button type="button" id="expandAll">Expand all</button>
-      <button type="button" id="collapseAll">Collapse all</button>
+      <span id="treeActions">
+        <button type="button" id="expandAll">Expand all</button>
+        <button type="button" id="collapseAll">Collapse all</button>
+      </span>
       <span class="sep"></span>
       <button type="button" id="openBtn" title="Open a roadmap.json file">Open…</button>
       <button type="button" id="discardBtn" hidden title="Drop unsaved changes and reload from disk">Discard</button>
@@ -31,6 +43,20 @@
         Couldn't load <code>roadmap.json</code>. Serve this folder over HTTP
         (see README) or use <strong>Open…</strong> to pick the file.
       </p>
+    </section>
+
+    <section class="cal-wrap" id="calWrap" aria-label="Time calendar" hidden>
+      <div class="cal-head">
+        <button type="button" id="calPrev" aria-label="Previous month">‹</button>
+        <h2 id="calTitle"></h2>
+        <button type="button" id="calNext" aria-label="Next month">›</button>
+        <button type="button" id="calToday">Today</button>
+        <span class="cal-total" id="calTotal"></span>
+      </div>
+      <div class="cal-body">
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-day" id="calDay"></div>
+      </div>
     </section>
 
     <aside class="next" aria-label="What's next">

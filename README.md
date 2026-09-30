@@ -37,6 +37,53 @@ Then open <http://localhost:8000> in Chrome or Edge.
 | Jump to an item | Click it in **What's next** |
 | Save | **Save** or Ctrl+S |
 
+## Time tracking and calendar
+
+- Hover a row and click **▶** to start a timer on it; click **■** (or **Stop**
+  in the top bar) to stop. Starting another task stops the current one.
+  Starting a planned task also marks it active.
+- A running timer survives a refresh or closing the tab; it keeps counting
+  from the original start time.
+- The **Calendar** tab shows each day's tracked time, shaded by amount. Click
+  a day to see time per task and the individual sessions. You can delete a
+  session or add time by hand there.
+- Each row shows its total time (branches include their children).
+- Sessions are stored in `roadmap.json` under `"log"` (`node`, `label`,
+  `start`, `end` as epoch milliseconds), so they're saved with the roadmap.
+  Sessions crossing midnight are split between the two days.
+
+## Windows app (.exe) and updates
+
+**Install:** download `Roadmap Tree Setup x.y.z.exe` from the repo's
+**Releases** page and run it. The installer is unsigned, so SmartScreen will
+warn ("More info" → "Run anyway"). Data lives in
+`%APPDATA%\roadmap-tree\roadmap.json`; **Save** writes there directly.
+
+**Updates:** the installed app checks GitHub Releases at startup and every 4
+hours, downloads new versions in the background, and asks whether to restart.
+Your data isn't touched by updates.
+
+**Publish a new version** (no Node needed on your PC, GitHub builds it):
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
+The *Release* workflow (`.github/workflows/release.yml`) builds the installer
+and attaches it to a release. Tag versions must go up each time.
+
+The repo must be **public** for installed apps to fetch updates without a
+token.
+
+**Build locally instead** (needs [Node.js](https://nodejs.org) LTS):
+
+```bash
+npm install
+npm start        # try it as a desktop window
+npm run dist     # builds dist/Roadmap Tree Setup 0.2.0.exe
+```
+
 **Saving.** In Chrome/Edge, Save uses the File System Access API. The first
 time, pick your project's `roadmap.json` in the dialog and allow the write.
 After that, Save writes to the same file without asking, until you reload the

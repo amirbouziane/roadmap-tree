@@ -253,6 +253,86 @@ button.primary.dirty { border-color: var(--green); color: var(--green); }
   min-width: 160px;
 }
 
+/* ---------- tabs + timer ---------- */
+
+[hidden] { display: none !important; }
+
+.tabs { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; }
+.tabs button { border: 0; background: transparent; color: var(--muted); padding: 3px 12px; }
+.tabs button.on { background: var(--hover); color: var(--fg); }
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 320px;
+}
+.timer #timerLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-clock { font-variant-numeric: tabular-nums; color: var(--green); }
+.timer-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: blink 1.6s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .timer-dot { animation: none; } }
+
+.rt-spent { fill: var(--muted); }
+.rt-node.running .rt-act.play { visibility: visible; fill: var(--green); }
+.rt-act.play:hover { fill: var(--green); }
+
+/* ---------- calendar ---------- */
+
+.cal-wrap { flex: 1; overflow: auto; padding: 20px 24px 48px; }
+
+.cal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.cal-head h2 { margin: 0 8px; font-size: 16px; font-weight: 600; min-width: 150px; }
+.cal-total { margin-left: auto; color: var(--muted); font-size: 13px; }
+
+.cal-body { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(58px, 1fr)); gap: 4px; flex: 1 1 420px; max-width: 640px; }
+.cal-dow { font-size: 11px; color: var(--muted); text-align: center; padding-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.cal-cell {
+  display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start;
+  min-height: 64px; padding: 6px 8px; border-radius: 6px; text-align: left;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.cal-cell.other { opacity: 0.4; }
+.cal-cell.lv1 { background: color-mix(in srgb, var(--green) 12%, var(--bg)); }
+.cal-cell.lv2 { background: color-mix(in srgb, var(--green) 26%, var(--bg)); }
+.cal-cell.lv3 { background: color-mix(in srgb, var(--green) 44%, var(--bg)); }
+.cal-cell.lv4 { background: color-mix(in srgb, var(--green) 66%, var(--bg)); }
+.cal-cell.today .cal-num { font-weight: 700; color: var(--green); }
+.cal-cell.lv4.today .cal-num { color: var(--fg); }
+.cal-cell.sel { outline: 1.5px solid var(--fg); outline-offset: -1px; }
+.cal-num { font-size: 12px; }
+.cal-dur { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.cal-day { flex: 1 1 280px; min-width: 260px; max-width: 420px; }
+.cal-day h3 { display: flex; justify-content: space-between; margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.cal-day .day-total { color: var(--green); font-variant-numeric: tabular-nums; }
+.cal-day h4 { margin: 18px 0 6px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.cal-day ul { list-style: none; margin: 0; padding: 0; }
+.cal-day li { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; }
+.cal-day .lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-day .t { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cal-day .dur { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cal-day .x { border: 0; background: transparent; color: var(--muted); padding: 0 4px; visibility: hidden; }
+.cal-day li:hover .x { visibility: visible; }
+.cal-day .x:hover { color: var(--danger); background: transparent; }
+.cal-day .none { color: var(--muted); margin: 0; }
+
+.manual { display: flex; flex-wrap: wrap; gap: 6px; }
+.manual h4 { flex: 0 0 100%; margin-bottom: 0; }
+.manual select, .manual input {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--btn-bg);
+  border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px;
+}
+.manual select { flex: 1 1 140px; min-width: 0; }
+.manual input { width: 90px; }
+
 /* ---------- toast ---------- */
 
 .toast {
