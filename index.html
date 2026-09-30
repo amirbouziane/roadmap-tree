@@ -26,6 +26,7 @@
     </div>
     <div class="actions">
       <span id="treeActions">
+        <button type="button" id="addRoot" title="Add a top-level item">+ Add item</button>
         <button type="button" id="expandAll">Expand all</button>
         <button type="button" id="collapseAll">Collapse all</button>
       </span>
@@ -39,6 +40,10 @@
   <main class="layout">
     <section class="tree-wrap" id="treeWrap" aria-label="Roadmap tree">
       <div id="tree"></div>
+      <p class="empty" id="emptyState" hidden>
+        Nothing here yet. Click <strong>+ Add item</strong> to create your first
+        item, and double-click the title above to rename this roadmap.
+      </p>
       <p class="empty" id="loadError" hidden>
         Couldn't load <code>roadmap.json</code>. Serve this folder over HTTP
         (see README) or use <strong>Open…</strong> to pick the file.
