@@ -802,12 +802,21 @@ function bindEvents() {
   $('openBtn').onclick = openFile;
   $('discardBtn').onclick = discard;
 
-  // Add a top-level item (the per-row "+" only adds children).
-  $('addRoot').onclick = () => {
-    const node = { id: newId(state.tree), label: 'New item', status: 'planned' };
+  // Add a top-level (main) step; the per-row "+" only adds children.
+  const addRoot = () => {
+    const node = { id: newId(state.tree), label: 'New step', status: 'planned' };
     commit((t) => { t.nodes.push(node); });
     startRename(node.id, true);
   };
+  $('addRoot').onclick = addRoot;
+  $('addRootBottom').onclick = addRoot;
+
+  // Desktop app: show the installed version next to the app name.
+  if (IS_DESKTOP) {
+    fetch('version.json').then((r) => r.json()).then((v) => { $('appVer').textContent = 'v' + v.version; }).catch(() => {});
+  } else {
+    $('appVer').textContent = '(web)';
+  }
 
   // Double-click the title to rename the roadmap; Enter or blur saves, Esc cancels.
   $('title').addEventListener('dblclick', () => {

@@ -8,6 +8,10 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="appbar">
+    <span class="app-name">Roadmap Tree</span>
+    <span class="app-ver" id="appVer"></span>
+  </div>
   <header class="topbar">
     <h1 id="title">roadmap-tree</h1>
     <div class="progress" title="Share of leaf items marked done">
@@ -26,7 +30,7 @@
     </div>
     <div class="actions">
       <span id="treeActions">
-        <button type="button" id="addRoot" title="Add a top-level item">+ Add item</button>
+        <button type="button" id="addRoot" title="Add a main (top-level) step">+ Add main step</button>
         <button type="button" id="expandAll">Expand all</button>
         <button type="button" id="collapseAll">Collapse all</button>
       </span>
@@ -41,9 +45,10 @@
     <section class="tree-wrap" id="treeWrap" aria-label="Roadmap tree">
       <div id="tree"></div>
       <p class="empty" id="emptyState" hidden>
-        Nothing here yet. Click <strong>+ Add item</strong> to create your first
-        item, and double-click the title above to rename this roadmap.
+        Nothing here yet. Click <strong>+ Add main step</strong> to create your
+        first step, and double-click the title above to rename this roadmap.
       </p>
+      <button type="button" class="add-main" id="addRootBottom">+ Add main step</button>
       <p class="empty" id="loadError" hidden>
         Couldn't load <code>roadmap.json</code>. Serve this folder over HTTP
         (see README) or use <strong>Open…</strong> to pick the file.
