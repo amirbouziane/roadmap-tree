@@ -257,6 +257,13 @@ button.primary.dirty { border-color: var(--green); color: var(--green); }
 
 .rt-node.flash .rt-row { fill: color-mix(in srgb, var(--green) 14%, transparent); }
 
+/* drag to reorder */
+.rt-act.grip { cursor: grab; }
+body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select: none; }
+.rt-node.dragging { opacity: 0.4; }
+.drop-ind { position: absolute; pointer-events: none; z-index: 5; background: var(--green); border-radius: 1px; }
+.drop-ind.inside { background: color-mix(in srgb, var(--green) 14%, transparent); outline: 1.5px solid var(--green); outline-offset: -1px; border-radius: 4px; }
+
 /* inline rename box */
 .rename {
   position: absolute;

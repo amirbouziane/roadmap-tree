@@ -83,6 +83,29 @@ function whatsNext(tree, limit = 5) {
   return { active, planned };
 }
 
+/** True if `id` is `node` itself or anywhere beneath it. */
+function containsId(node, id) {
+  return node.id === id || (hasKids(node) && node.children.some((c) => containsId(c, id)));
+}
+
+/**
+ * Move node `id` relative to node `targetId`: pos is 'before', 'after'
+ * (as a sibling) or 'inside' (as the target's last child). Returns false,
+ * changing nothing, if the move is impossible (onto itself or its own subtree).
+ */
+function moveNode(tree, id, targetId, pos) {
+  const src = findNode(tree, id);
+  const dst = findNode(tree, targetId);
+  if (!src || !dst || containsId(src.node, targetId)) return false;
+  src.siblings.splice(src.siblings.indexOf(src.node), 1);
+  if (pos === 'inside') (dst.node.children ||= []).push(src.node);
+  else {
+    const i = dst.siblings.indexOf(dst.node); // index after the removal above
+    dst.siblings.splice(pos === 'before' ? i : i + 1, 0, src.node);
+  }
+  return true;
+}
+
 /** Ids of every node that has children (used for expand/collapse all). */
 function branchIds(tree) {
   const ids = [];
@@ -307,7 +330,10 @@ function render(tree, view = {}) {
     g += `<tspan class="rt-label" data-action="label">${esc(n.label || '(untitled)')}</tspan>`;
     if (n.note) g += `<tspan class="rt-note" dx="10">${esc(n.note)}</tspan>`;
     if (spentMs >= MIN / 2) g += `<tspan class="rt-note rt-spent" dx="10">${fmtDur(spentMs)}</tspan>`;
-    g += `<tspan class="rt-act play" data-action="timer" dx="12"><title>${isRunning ? 'Stop timer' : 'Start timer'}</title>${isRunning ? '■' : '▶'}</tspan>`;
+    g += `<tspan class="rt-act grip" data-action="grip" dx="12"><title>Drag to move</title>≡</tspan>`;
+    g += `<tspan class="rt-act" data-action="up" dx="6"><title>Move up</title>↑</tspan>`;
+    g += `<tspan class="rt-act" data-action="down" dx="4"><title>Move down</title>↓</tspan>`;
+    g += `<tspan class="rt-act play" data-action="timer" dx="8"><title>${isRunning ? 'Stop timer' : 'Start timer'}</title>${isRunning ? '■' : '▶'}</tspan>`;
     g += `<tspan class="rt-act add" data-action="add" dx="8"><title>Add child</title>+</tspan>`;
     g += `<tspan class="rt-act del" data-action="delete" dx="8"><title>Delete</title>×</tspan>`;
     g += `</text></g>`;
@@ -625,6 +651,15 @@ function onTreeClick(e) {
     case 'timer':
       if (state.timer && state.timer.nodeId === id) stopTimer(); else startTimer(id);
       break;
+    case 'up':
+    case 'down': {
+      // Swap with the neighbouring sibling.
+      const i = hit.siblings.indexOf(hit.node);
+      const j = i + (target.dataset.action === 'up' ? -1 : 1);
+      if (j < 0 || j >= hit.siblings.length) { toast(j < 0 ? 'Already first here.' : 'Already last here.'); return; }
+      commit(() => { [hit.siblings[i], hit.siblings[j]] = [hit.siblings[j], hit.siblings[i]]; });
+      break;
+    }
     case 'label':
       // Delay so a double-click (rename) doesn't also toggle.
       if (!hasKids(hit.node)) return;
@@ -648,6 +683,69 @@ function onTreeClick(e) {
       break;
     }
   }
+}
+
+/**
+ * Drag a step by its ≡ handle. Dropping on the top/bottom edge of another
+ * row puts it before/after that row; dropping on the middle makes it a child.
+ */
+function startDrag(e, srcId) {
+  e.preventDefault();
+  const wrap = $('treeWrap');
+  const srcNode = findNode(state.tree, srcId).node;
+  const srcG = wrap.querySelector(`.rt-node[data-id="${CSS.escape(srcId)}"]`);
+  const ind = document.createElement('div');
+  ind.className = 'drop-ind';
+  ind.hidden = true;
+  wrap.appendChild(ind);
+  srcG.classList.add('dragging');
+  document.body.classList.add('is-dragging');
+  let drop = null;
+
+  const targetAt = (ev) => {
+    for (const g of wrap.querySelectorAll('.rt-node')) {
+      const r = g.querySelector('.rt-row').getBoundingClientRect();
+      if (ev.clientY < r.top || ev.clientY >= r.bottom) continue;
+      if (containsId(srcNode, g.dataset.id)) return null; // not onto itself or its own children
+      const f = (ev.clientY - r.top) / r.height;
+      return { id: g.dataset.id, pos: f < 0.3 ? 'before' : f > 0.7 ? 'after' : 'inside', r, g };
+    }
+    return null;
+  };
+
+  const onMove = (ev) => {
+    const wr = wrap.getBoundingClientRect();
+    if (ev.clientY < wr.top + 30) wrap.scrollTop -= 12; // scroll while dragging near the edges
+    else if (ev.clientY > wr.bottom - 30) wrap.scrollTop += 12;
+    drop = targetAt(ev);
+    ind.hidden = !drop;
+    if (!drop) return;
+    const left = drop.g.querySelector('.rt-dot').getBoundingClientRect().left - wr.left + wrap.scrollLeft - 6;
+    const y = (drop.pos === 'after' ? drop.r.bottom : drop.r.top) - wr.top + wrap.scrollTop;
+    ind.className = 'drop-ind ' + drop.pos;
+    ind.style.left = left + 'px';
+    ind.style.top = (drop.pos === 'inside' ? drop.r.top - wr.top + wrap.scrollTop : y - 1) + 'px';
+    ind.style.height = drop.pos === 'inside' ? drop.r.height + 'px' : '2px';
+    ind.style.width = Math.max(120, wr.width - left - 24) + 'px';
+  };
+
+  const end = (keep) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('keydown', onKey);
+    ind.remove();
+    srcG.classList.remove('dragging');
+    document.body.classList.remove('is-dragging');
+    if (!keep || !drop) return;
+    const { id, pos } = drop;
+    if (pos === 'inside') { state.collapsed.delete(id); saveView(); }
+    commit((tree) => { moveNode(tree, srcId, id, pos); });
+  };
+  const onUp = () => end(true);
+  const onKey = (ev) => { if (ev.key === 'Escape') end(false); };
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('keydown', onKey);
 }
 
 function onTreeDblClick(e) {
@@ -816,6 +914,11 @@ function bindEvents() {
   const tree = $('tree');
   tree.addEventListener('click', onTreeClick);
   tree.addEventListener('dblclick', onTreeDblClick);
+  tree.addEventListener('pointerdown', (e) => {
+    const grip = e.target.closest('[data-action="grip"]');
+    const g = e.target.closest('.rt-node');
+    if (grip && g && e.button === 0) startDrag(e, g.dataset.id);
+  });
 
   $('expandAll').onclick = () => { state.collapsed.clear(); saveView(); update(); };
   $('collapseAll').onclick = () => { state.collapsed = new Set(branchIds(state.tree)); saveView(); update(); };
