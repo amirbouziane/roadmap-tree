@@ -782,6 +782,24 @@ async function discard() {
   toast('Reloaded from disk');
 }
 
+/** Desktop only: ask the app to check GitHub for a newer version now. */
+async function checkForUpdates() {
+  const btn = $('checkUpdate');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try {
+    const r = await (await fetch('update/check', { method: 'POST' })).json();
+    if (r.status === 'available') toast(`Version ${r.version} found, downloading. You'll be asked to restart.`);
+    else if (r.status === 'none') toast(`You're up to date (v${r.version}).`);
+    else if (r.status === 'dev') toast('Updates only work in the installed app.');
+    else toast(`Couldn't check for updates: ${r.message}`);
+  } catch {
+    toast("Couldn't check for updates.");
+  }
+  btn.disabled = false;
+  btn.textContent = 'Check for updates';
+}
+
 let toastTimer = null;
 function toast(msg) {
   const el = $('toast');
@@ -814,6 +832,8 @@ function bindEvents() {
   // Desktop app: show the installed version next to the app name.
   if (IS_DESKTOP) {
     fetch('version.json').then((r) => r.json()).then((v) => { $('appVer').textContent = 'v' + v.version; }).catch(() => {});
+    $('checkUpdate').hidden = false;
+    $('checkUpdate').onclick = checkForUpdates;
   } else {
     $('appVer').textContent = '(web)';
   }

@@ -57,6 +57,9 @@ body {
 }
 .app-name { font-weight: 600; letter-spacing: 0.02em; }
 .app-ver { font-variant-numeric: tabular-nums; }
+button.link { border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 0 4px; text-decoration: underline; }
+button.link:hover { background: transparent; color: var(--fg); }
+button.link:disabled { cursor: default; text-decoration: none; }
 
 .add-main { margin: 14px 0 0 14px; color: var(--muted); border-style: dashed; }
 .add-main:hover { color: var(--fg); }
