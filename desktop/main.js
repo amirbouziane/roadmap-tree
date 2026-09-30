@@ -15,8 +15,11 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 47631; // fixed so localStorage (drafts, timer) keeps the same origin
-const TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.json': 'application/json' };
-const STATIC = new Set(['index.html', 'styles.css', 'app.js']);
+const TYPES = {
+  '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
+  '.json': 'application/json', '.woff2': 'font/woff2',
+};
+const STATIC = new Set(['index.html', 'styles.css', 'app.js', 'markdown.js']);
 
 let dataFile;
 
@@ -32,7 +35,12 @@ const EXAMPLE = {
           { id: 'ex1b', label: 'Pick the tools', status: 'done' },
         ] },
         { id: 'ex2', label: 'Build', status: 'active', note: 'click the dot to change status', children: [
-          { id: 'ex2a', label: 'First prototype', status: 'active', note: 'hover a row and press ▶ to time it' },
+          {
+            id: 'ex2a', label: 'First prototype', status: 'active', note: 'hover a row and press ▶ to time it',
+            md: '## Notes\n\nClick a step to open its notes here. They support **Markdown** and LaTeX math.\n\n'
+              + '- Inline: $e^{i\\pi} + 1 = 0$\n- Block:\n\n$$\\int_0^\\infty e^{-x^2}\\,dx = \\frac{\\sqrt{\\pi}}{2}$$\n\n'
+              + '- [ ] Drag any step to reorder it\n',
+          },
           { id: 'ex2b', label: 'Polish', status: 'planned' },
         ] },
         { id: 'ex3', label: 'Launch', status: 'planned', note: 'hover a row for + and ×' },
@@ -89,9 +97,11 @@ function startServer() {
       return;
     }
 
-    const name = url === '/' ? 'index.html' : url.slice(1);
-    if (!STATIC.has(name)) { res.writeHead(404).end(); return; }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(name)] });
+    const name = url === '/' ? 'index.html' : decodeURIComponent(url.slice(1));
+    const isVendor = /^vendor\/[\w.\-/]+$/.test(name) && !name.includes('..');
+    if (!STATIC.has(name) && !isVendor) { res.writeHead(404).end(); return; }
+    if (!fs.existsSync(path.join(ROOT, name))) { res.writeHead(404).end(); return; }
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(name)] || 'application/octet-stream' });
     fs.createReadStream(path.join(ROOT, name)).pipe(res);
   });
   return new Promise((resolve, reject) => {
@@ -104,8 +114,12 @@ async function createWindow() {
   const origin = await startServer();
   const win = new BrowserWindow({ width: 1100, height: 720, autoHideMenuBar: true, title: 'Roadmap Tree' });
   win.loadURL(origin);
-  // Links that leave the app open in the normal browser.
-  win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  // Links in notes open in the normal browser (web links only), never inside the app window.
+  const openWeb = (url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); };
+  win.webContents.setWindowOpenHandler(({ url }) => { openWeb(url); return { action: 'deny' }; });
+  win.webContents.on('will-navigate', (ev, url) => {
+    if (!url.startsWith(origin)) { ev.preventDefault(); openWeb(url); }
+  });
 }
 
 /**

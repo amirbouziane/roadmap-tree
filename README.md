@@ -29,13 +29,32 @@ Then open <http://localhost:8000> in Chrome or Edge.
 | Action | How |
 | --- | --- |
 | Change status | Click a dot: planned → active → done → planned |
-| Collapse / expand | Click a branch's label or its chevron |
+| Open notes | Click a step's label |
+| Collapse / expand | Click a branch's chevron |
+| Move a step | Drag it (anywhere on the row, or the ≡ handle), or use ↑ / ↓ |
 | Rename | Double-click a label; Enter saves, Esc cancels |
 | Add a child | Hover a row, click **+** |
 | Delete | Hover a row, click **×** |
 | Everything open / shut | **Expand all** / **Collapse all** |
 | Jump to an item | Click it in **What's next** |
 | Save | **Save** or Ctrl+S |
+
+## Notes (Markdown and LaTeX)
+
+Click a step's label to open its notes in the pane next to the tree. A step
+with no notes opens straight into edit mode; press **Done** (or Esc) to see
+the rendered result, **Edit** to change it again. Steps that have notes show
+a small ¶ after their label. Notes save with the roadmap, in each step's
+`"md"` field.
+
+- Markdown: headings, lists, task lists (`- [ ]`), tables, code, quotes, links.
+- Math works like Obsidian: `$f_s \ge 2B$` inline, and `$$ ... $$` for a
+  block (may span lines). A `$` followed by a digit, like `$5`, is left as text.
+- Rendering uses bundled copies of marked, KaTeX and DOMPurify (`vendor/`), so
+  it works offline. Notes are sanitized, so scripts in a note never run.
+
+Collapse or expand a branch with its chevron (the label opens notes now).
+Drag any step, by its row or the ≡ handle, to move it; ↑/↓ also work.
 
 ## Time tracking and calendar
 
