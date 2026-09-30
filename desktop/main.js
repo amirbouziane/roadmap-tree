@@ -54,6 +54,15 @@ function startServer() {
       return;
     }
 
+    if (url === '/update/check' && req.method === 'POST') {
+      if (req.headers.origin && req.headers.origin !== origin) { res.writeHead(403).end(); return; }
+      checkNow().then((r) => {
+        res.writeHead(200, { 'Content-Type': TYPES['.json'] });
+        res.end(JSON.stringify(r));
+      });
+      return;
+    }
+
     if (url === '/version.json') {
       res.writeHead(200, { 'Content-Type': TYPES['.json'] });
       res.end(JSON.stringify({ version: app.getVersion() }));
@@ -84,9 +93,29 @@ async function createWindow() {
  * startup and every 4 hours; a new version downloads in the background and
  * the user chooses when to restart into it.
  */
+let updater = null; // set by setupAutoUpdate(); null when running from source
+
+/**
+ * Manual "Check for updates" (POST /update/check). Resolves to
+ * { status: 'dev' | 'available' | 'none' | 'error', version?, message? }.
+ * An available update downloads automatically; the restart dialog below follows.
+ */
+async function checkNow() {
+  if (!updater) return { status: 'dev' };
+  try {
+    const r = await updater.checkForUpdates();
+    const latest = r && r.updateInfo && r.updateInfo.version;
+    const available = r && r.isUpdateAvailable !== undefined ? r.isUpdateAvailable : latest && latest !== app.getVersion();
+    return available ? { status: 'available', version: latest } : { status: 'none', version: app.getVersion() };
+  } catch (e) {
+    return { status: 'error', message: e && e.message ? e.message.split('\n')[0] : 'unknown error' };
+  }
+}
+
 function setupAutoUpdate() {
   if (!app.isPackaged) return;
   const { autoUpdater } = require('electron-updater');
+  updater = autoUpdater;
   autoUpdater.on('error', (e) => console.warn('update check failed:', e && e.message));
   autoUpdater.on('update-downloaded', (info) => {
     dialog.showMessageBox({
