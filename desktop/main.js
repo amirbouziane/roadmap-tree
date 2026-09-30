@@ -54,6 +54,12 @@ function startServer() {
       return;
     }
 
+    if (url === '/version.json') {
+      res.writeHead(200, { 'Content-Type': TYPES['.json'] });
+      res.end(JSON.stringify({ version: app.getVersion() }));
+      return;
+    }
+
     const name = url === '/' ? 'index.html' : url.slice(1);
     if (!STATIC.has(name)) { res.writeHead(404).end(); return; }
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(name)] });
