@@ -53,10 +53,20 @@ Then open <http://localhost:8000> in Chrome or Edge.
 
 ## Timer, targets and the calendar
 
-- Hover a step and click **▶** to start its timer; click **■** to stop. Hover
+- Hover a step and click **▶** to start its timer; click **■** to stop. Several
+  steps can be timed at the same time; starting one never stops another. Hover
   the button to see the live running time (or the time tracked so far). The
-  window title also shows the running clock, and a green dot marks the project
-  tab that has a timer running.
+  window title shows the longest-running clock, and a green dot marks each
+  project tab that has a timer running.
+- **Deadline colours:** a target date within 5 days (`SOON_DAYS` in `app.js`)
+  turns **orange**, an overdue one turns **red**; finished steps are never
+  flagged. The colour appears on the step (with a coloured edge), at the top
+  of the project's sidebar under **Deadlines**, and as a dot on the project
+  tab.
+- **All projects:** under the calendar, the Calendar tab ranks every project
+  by how much attention it needs (worst deadline first) and lists all
+  unfinished deadlines from all projects, grouped as overdue, due soon, and
+  later. Click a card to open that project, or a deadline to jump to the step.
 - A **target date** is the day you want a step finished. Set it from the
   notes pane (**Target** date box), or open the **Calendar**, click a day, and
   use **Set target** there. Targets show as `target Oct 5` on the step (red if
