@@ -14,6 +14,7 @@
     <span class="app-ver" id="appVer"></span>
     <button type="button" class="link" id="checkUpdate" hidden>Check for updates</button>
   </div>
+  <nav class="projects" id="projectTabs" aria-label="Projects"></nav>
   <header class="topbar">
     <h1 id="title">roadmap-tree</h1>
     <div class="progress" title="Share of leaf items marked done">
@@ -24,12 +25,6 @@
       <button type="button" data-tab="tree" class="on">Tree</button>
       <button type="button" data-tab="calendar">Calendar</button>
     </nav>
-    <div class="timer" id="timerChip" hidden>
-      <span class="timer-dot"></span>
-      <span id="timerLabel"></span>
-      <span id="timerClock" class="timer-clock"></span>
-      <button type="button" id="timerStop">Stop</button>
-    </div>
     <div class="actions">
       <span id="treeActions">
         <button type="button" id="addRoot" title="Add a main (top-level) step">+ Add main step</button>
@@ -37,7 +32,8 @@
         <button type="button" id="collapseAll">Collapse all</button>
       </span>
       <span class="sep"></span>
-      <button type="button" id="openBtn" title="Open a roadmap.json file">Open…</button>
+      <button type="button" id="importBtn" title="Add a project from a .json file">Import…</button>
+      <button type="button" id="saveAsBtn" title="Save this project as a .json file you can open elsewhere">Save as…</button>
       <button type="button" id="discardBtn" hidden title="Drop unsaved changes and reload from disk">Discard</button>
       <button type="button" id="saveBtn" class="primary" title="Save roadmap.json (Ctrl+S)">Save</button>
     </div>
@@ -64,6 +60,9 @@
           <div class="note-crumb" id="noteCrumb"></div>
         </div>
         <div class="note-tools">
+          <label class="note-due" title="Target date to finish this step">Target
+            <input type="date" id="noteDue">
+          </label>
           <button type="button" id="noteEdit">Edit</button>
           <button type="button" id="noteClose" aria-label="Close notes" title="Close">×</button>
         </div>
@@ -95,6 +94,7 @@
     </aside>
   </main>
 
+  <div class="tip" id="tip" role="tooltip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="vendor/marked.min.js"></script>
