@@ -484,6 +484,7 @@ const VIEW_KEY = 'roadmap-tree:collapsed';
 const $ = (id) => document.getElementById(id);
 
 const IS_DESKTOP = navigator.userAgent.includes('Electron'); // packaged app, see desktop/main.js
+let appVersion = null; // set from the desktop app's version.json
 const TIMER_KEY = 'roadmap-tree:timer';
 const TAB_KEY = 'roadmap-tree:tab';
 
@@ -598,6 +599,11 @@ function update() {
   renderNext(tree);
   renderNotePane();
   updateSaveState();
+
+  // Tracked time (all projects) feeds the aquarium's "every 30 min = 1 pearl" quest.
+  let tracked = 0;
+  for (const proj of state.projects) for (const e of proj.log) tracked += e.end - e.start;
+  Aquarium.trackedTime(tracked);
 }
 
 /** Save button shows a dot (and Discard appears) while there are unsaved changes. */
@@ -860,9 +866,12 @@ function onTreeClick(e) {
   if (!hit) return;
 
   switch (target.dataset.action) {
-    case 'cycle':
-      commit(() => { hit.node.status = nextStatus(statusOf(hit.node)); });
+    case 'cycle': {
+      const to = nextStatus(statusOf(hit.node));
+      commit(() => { hit.node.status = to; });
+      if (to === 'done') Aquarium.stepDone(`${state.tree.id}:${id}`); // quest reward, once per step
       break;
+    }
     case 'toggle':
       toggleBranch(id);
       break;
@@ -1173,6 +1182,52 @@ async function checkForUpdates() {
   btn.textContent = 'Check for updates';
 }
 
+/* ---- What's new (shown once after an update) ---- */
+
+const SEEN_KEY = 'roadmap-tree:lastSeenVersion';
+
+/** Compare 'a.b.c' version strings: negative, 0, or positive. */
+function cmpVer(a, b) {
+  const x = String(a).split('.').map(Number);
+  const y = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  return 0;
+}
+
+async function loadChangelog() {
+  try { return await (await fetch('changelog.json', { cache: 'no-store' })).json(); } catch { return []; }
+}
+
+const TAG_LABEL = { new: 'New', improved: 'Improved', fixed: 'Fixed' };
+
+/** Fill and open the dialog with these changelog entries (newest first). */
+function showWhatsNew(entries, version) {
+  $('wnTitle').textContent = version ? `What's new in v${version}` : "What's new";
+  $('wnBody').innerHTML = entries.map((e) =>
+    `<section><h3>v${esc(e.version)}${e.date ? `<small>${esc(e.date)}</small>` : ''}</h3>`
+    + (e.title ? `<p class="wn-sub">${esc(e.title)}</p>` : '')
+    + '<ul>' + e.items.map((it) =>
+      `<li><span class="chip ${esc(it.tag)}">${esc(TAG_LABEL[it.tag] || it.tag)}</span><span>${esc(it.text)}</span></li>`).join('')
+    + '</ul></section>').join('');
+  $('whatsNew').hidden = false;
+  $('wnClose').focus();
+}
+
+/**
+ * Desktop startup: if this is a newer version than the one last seen, show
+ * what changed since then. A brand-new install gets no popup; an upgrade
+ * from a version that predates this feature sees everything since 0.2.1.
+ */
+async function maybeShowWhatsNew(info) {
+  const seen = store.get(SEEN_KEY);
+  store.set(SEEN_KEY, info.version);
+  if (!seen && info.firstRun) return;
+  if (seen && cmpVer(seen, info.version) >= 0) return;
+  const from = seen || '0.2.1';
+  const entries = (await loadChangelog()).filter((e) => cmpVer(e.version, from) > 0 && cmpVer(e.version, info.version) <= 0);
+  if (entries.length) showWhatsNew(entries, info.version);
+}
+
 let toastTimer = null;
 function toast(msg) {
   const el = $('toast');
@@ -1292,7 +1347,11 @@ function bindEvents() {
 
   // Desktop app: show the installed version next to the app name.
   if (IS_DESKTOP) {
-    fetch('version.json').then((r) => r.json()).then((v) => { $('appVer').textContent = 'v' + v.version; }).catch(() => {});
+    fetch('version.json').then((r) => r.json()).then((v) => {
+      $('appVer').textContent = 'v' + v.version;
+      appVersion = v.version;
+      return maybeShowWhatsNew(v);
+    }).catch(() => {});
     $('checkUpdate').hidden = false;
     $('checkUpdate').onclick = checkForUpdates;
   } else {
@@ -1300,6 +1359,21 @@ function bindEvents() {
   }
 
   $('title').addEventListener('dblclick', startTitleEdit);
+
+  // What's new window and the aquarium.
+  $('wnClose').onclick = () => { $('whatsNew').hidden = true; };
+  $('whatsNew').addEventListener('click', (e) => { if (e.target === $('whatsNew')) $('whatsNew').hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('whatsNew').hidden) $('whatsNew').hidden = true; });
+  $('whatsNewBtn').onclick = async () => {
+    const all = await loadChangelog();
+    const shown = appVersion ? all.filter((e) => cmpVer(e.version, appVersion) <= 0) : all;
+    showWhatsNew(shown.length ? shown : all, appVersion);
+  };
+  Aquarium.init({
+    toast,
+    onChange: (n) => { $('aquariumBtn').textContent = n > 0 ? `Aquarium (${n} ●)` : 'Aquarium'; },
+  });
+  $('aquariumBtn').onclick = () => Aquarium.toggle();
 
   // View tabs and calendar navigation.
   document.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });

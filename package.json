@@ -18,7 +18,7 @@
   "build": {
     "appId": "local.roadmaptree.app",
     "productName": "Roadmap Tree",
-    "files": ["index.html", "styles.css", "app.js", "markdown.js", "vendor/**", "desktop/**"],
+    "files": ["index.html", "styles.css", "app.js", "markdown.js", "aquarium.js", "changelog.json", "vendor/**", "desktop/**"],
     "win": { "target": "nsis" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
     "publish": [{ "provider": "github", "owner": "amirbouziane", "repo": "roadmap-tree", "releaseType": "release" }]

@@ -19,7 +19,7 @@ const TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
   '.json': 'application/json', '.woff2': 'font/woff2',
 };
-const STATIC = new Set(['index.html', 'styles.css', 'app.js', 'markdown.js']);
+const STATIC = new Set(['index.html', 'styles.css', 'app.js', 'markdown.js', 'aquarium.js', 'changelog.json']);
 
 let dataFile;
 
@@ -51,9 +51,14 @@ const EXAMPLE = {
 };
 
 /** First run: write the example tree (the bundled roadmap.json is only a dev sample). */
+let firstRun = false; // true when this launch created the data file (a brand-new install)
+
 function ensureDataFile() {
   dataFile = path.join(app.getPath('userData'), 'roadmap.json');
-  if (!fs.existsSync(dataFile)) fs.writeFileSync(dataFile, JSON.stringify(EXAMPLE, null, 2) + '\n');
+  if (!fs.existsSync(dataFile)) {
+    fs.writeFileSync(dataFile, JSON.stringify(EXAMPLE, null, 2) + '\n');
+    firstRun = true;
+  }
 }
 
 function startServer() {
@@ -93,7 +98,7 @@ function startServer() {
 
     if (url === '/version.json') {
       res.writeHead(200, { 'Content-Type': TYPES['.json'] });
-      res.end(JSON.stringify({ version: app.getVersion() }));
+      res.end(JSON.stringify({ version: app.getVersion(), firstRun }));
       return;
     }
 

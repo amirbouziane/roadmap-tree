@@ -13,6 +13,8 @@
     <span class="app-name">Roadmap Tree</span>
     <span class="app-ver" id="appVer"></span>
     <button type="button" class="link" id="checkUpdate" hidden>Check for updates</button>
+    <button type="button" class="link" id="whatsNewBtn">What's new</button>
+    <button type="button" class="link" id="aquariumBtn" title="Open the aquarium">Aquarium</button>
   </div>
   <nav class="projects" id="projectTabs" aria-label="Projects"></nav>
   <header class="topbar">
@@ -94,6 +96,31 @@
     </aside>
   </main>
 
+  <aside class="tank" id="tank" aria-label="Aquarium" hidden>
+    <header class="tank-head" id="tankHead">
+      <span class="tank-title">Aquarium</span>
+      <span class="tank-pearls" title="Pearls: earn them by finishing steps and tracking time"><i class="pearl"></i><b id="tankPearls">0</b></span>
+      <button type="button" id="tankMin" title="Minimize">–</button>
+      <button type="button" id="tankClose" title="Close">×</button>
+    </header>
+    <div class="tank-body">
+      <canvas id="tankCanvas" width="120" height="76"></canvas>
+      <div class="tank-bar">
+        <button type="button" id="feedBtn">Feed</button>
+        <button type="button" id="shopBtn">Shop</button>
+      </div>
+      <div class="tank-shop" id="tankShop" hidden></div>
+    </div>
+  </aside>
+
+  <div class="modal" id="whatsNew" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="wnTitle">
+      <h2 id="wnTitle">What's new</h2>
+      <div class="wn-body" id="wnBody"></div>
+      <div class="modal-actions"><button type="button" class="primary" id="wnClose">Got it</button></div>
+    </div>
+  </div>
+
   <div class="tip" id="tip" role="tooltip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -101,6 +128,7 @@
   <script src="vendor/purify.min.js"></script>
   <script src="vendor/katex.min.js"></script>
   <script src="markdown.js"></script>
+  <script src="aquarium.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
