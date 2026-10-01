@@ -355,21 +355,66 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tabs button { border: 0; background: transparent; color: var(--muted); padding: 3px 12px; }
 .tabs button.on { background: var(--hover); color: var(--fg); }
 
-.timer {
+/* project tabs */
+.projects {
+  display: flex;
+  gap: 2px;
+  padding: 8px 24px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.ptab, .ptab-add {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 2px 4px 2px 10px;
-  border: 1px solid var(--green);
-  border-radius: 8px;
-  font-size: 13px;
-  max-width: 320px;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 5px 8px 5px 12px;
+  margin-bottom: -1px;
+  max-width: 220px;
+  white-space: nowrap;
 }
-.timer #timerLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.timer-clock { font-variant-numeric: tabular-nums; color: var(--green); }
-.timer-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: blink 1.6s ease-in-out infinite; }
-@keyframes blink { 50% { opacity: 0.3; } }
-@media (prefers-reduced-motion: reduce) { .timer-dot { animation: none; } }
+.ptab:hover, .ptab-add:hover { background: var(--hover); }
+.ptab.on { color: var(--fg); background: var(--bg); border-color: var(--border); }
+.ptab .ptitle { overflow: hidden; text-overflow: ellipsis; }
+.ptab .pclose { color: var(--muted); padding: 0 4px; border-radius: 4px; visibility: hidden; }
+.ptab:hover .pclose, .ptab.on .pclose { visibility: visible; }
+.ptab .pclose:hover { color: var(--danger); background: var(--hover); }
+.ptab-add { padding: 5px 10px; }
+.tdot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+
+/* live time beside the timer button */
+.tip {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.rt-due.overdue { fill: var(--danger); }
+.cal-top { display: flex; justify-content: space-between; align-items: baseline; width: 100%; gap: 4px; }
+.cal-due { font-size: 11px; color: var(--muted); }
+.cal-due.overdue { color: var(--danger); }
+.cal-cell.lv4 .cal-due { color: var(--fg); }
+.cal-day .day-due li.done .lbl { color: var(--muted); text-decoration: line-through; }
+.cal-day .mini-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; transform: translateY(-1px); }
+.cal-day .mini-dot.s-active { background: var(--green); }
+.cal-day .mini-dot.s-done { background: var(--green); opacity: 0.55; }
+.cal-day .mini-dot.s-planned { border: 1px solid var(--planned); }
+.manual.due { margin-top: 8px; }
+
+.note-due { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.note-due input { font: inherit; font-size: 12px; color: var(--fg); background: var(--btn-bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; color-scheme: light dark; }
 
 .rt-spent { fill: var(--muted); }
 .rt-node.running .rt-act.play { visibility: visible; fill: var(--green); }

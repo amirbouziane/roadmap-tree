@@ -125,7 +125,7 @@ function newId(tree) {
 /** Validate/normalise loaded JSON: ensures a title, a nodes array and unique ids. */
 function normalize(data) {
   if (!data || !Array.isArray(data.nodes)) throw new Error('roadmap.json needs a "nodes" array');
-  const tree = { title: String(data.title || 'Roadmap'), nodes: data.nodes, log: [] };
+  const tree = { id: String(data.id || newProjectId()), title: String(data.title || 'Roadmap'), nodes: data.nodes, log: [] };
   // Time log: [{ id, node, label, start, end }] with epoch-ms start/end.
   if (Array.isArray(data.log)) {
     tree.log = data.log.filter((e) => e && typeof e.node === 'string' && e.start < e.end)
@@ -137,8 +137,41 @@ function normalize(data) {
     if (!n.id || seen.has(n.id)) n.id = 'n' + Math.random().toString(36).slice(2, 8);
     seen.add(n.id);
     if (n.status !== undefined && !STATUSES.includes(n.status)) delete n.status;
+    if (n.due !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(n.due)) delete n.due; // target date, 'YYYY-MM-DD'
   });
   return tree;
+}
+
+const newProjectId = () => 'p' + Math.random().toString(36).slice(2, 8);
+
+/**
+ * Load a file's contents as a set of projects. Accepts either a single
+ * project ({ title, nodes, log }) or a workspace
+ * ({ projects: [...], active: id }). Returns { projects, active }.
+ */
+function normalizeWorkspace(data) {
+  const list = data && Array.isArray(data.projects) ? data.projects : [data];
+  if (!list.length) throw new Error('File has no projects');
+  const projects = list.map(normalize);
+  const ids = new Set();
+  for (const p of projects) {
+    if (ids.has(p.id)) p.id = newProjectId();
+    ids.add(p.id);
+  }
+  const active = projects.find((p) => p.id === (data && data.active)) || projects[0];
+  return { projects, active };
+}
+
+/** Map of 'YYYY-MM-DD' -> nodes whose target date is that day. */
+function dueByDay(tree) {
+  const m = new Map();
+  walk(tree.nodes, (n) => { if (n.due) m.set(n.due, (m.get(n.due) || []).concat(n)); });
+  return m;
+}
+
+/** "Oct 5" for a 'YYYY-MM-DD' target date. */
+function fmtDue(key) {
+  return new Date(dayStart(key)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 /* ---- time log helpers (epoch-ms entries, local-time days) ---- */
@@ -294,7 +327,7 @@ function render(tree, view = {}) {
   // Rough width estimate so long labels aren't clipped (no text measuring here).
   let width = 320;
   for (const r of rows) {
-    const w = r.x + L.textGap + r.node.label.length * 8 + (r.node.note ? r.node.note.length * 7 + 14 : 0) + 60;
+    const w = r.x + L.textGap + r.node.label.length * 8 + (r.node.note ? r.node.note.length * 7 + 14 : 0) + (r.node.due ? 100 : 0) + 60;
     if (w > width) width = w;
   }
   const height = L.padY * 2 + rows.length * L.row;
@@ -331,10 +364,14 @@ function render(tree, view = {}) {
     if (n.md) g += `<tspan class="rt-hasnote" dx="8"><title>Has notes</title>¶</tspan>`;
     if (n.note) g += `<tspan class="rt-note" dx="10">${esc(n.note)}</tspan>`;
     if (spentMs >= MIN / 2) g += `<tspan class="rt-note rt-spent" dx="10">${fmtDur(spentMs)}</tspan>`;
+    if (n.due) {
+      const overdue = view.today && n.due < view.today && r.status !== 'done';
+      g += `<tspan class="rt-note rt-due${overdue ? ' overdue' : ''}" dx="10">target ${esc(fmtDue(n.due))}</tspan>`;
+    }
     g += `<tspan class="rt-act grip" data-action="grip" dx="12"><title>Drag to move</title>≡</tspan>`;
     g += `<tspan class="rt-act" data-action="up" dx="6"><title>Move up</title>↑</tspan>`;
     g += `<tspan class="rt-act" data-action="down" dx="4"><title>Move down</title>↓</tspan>`;
-    g += `<tspan class="rt-act play" data-action="timer" dx="8"><title>${isRunning ? 'Stop timer' : 'Start timer'}</title>${isRunning ? '■' : '▶'}</tspan>`;
+    g += `<tspan class="rt-act play" data-action="timer" dx="8">${isRunning ? '■' : '▶'}</tspan>`;
     g += `<tspan class="rt-act add" data-action="add" dx="8"><title>Add child</title>+</tspan>`;
     g += `<tspan class="rt-act del" data-action="delete" dx="8"><title>Delete</title>×</tspan>`;
     g += `</text></g>`;
@@ -361,6 +398,7 @@ function entryLabel(tree, e) {
  */
 function renderCalendar(tree, view) {
   const totals = totalsByDay(tree.log);
+  const dues = dueByDay(tree);
   const lead = (new Date(view.year, view.month, 1).getDay() + 6) % 7;
   const days = new Date(view.year, view.month + 1, 0).getDate();
   const rows = Math.ceil((lead + days) / 7);
@@ -375,8 +413,13 @@ function renderCalendar(tree, view) {
       + (d.getMonth() !== view.month ? ' other' : '')
       + (key === view.today ? ' today' : '')
       + (key === view.selected ? ' sel' : '');
+    // Target marker: "⚑ n" for steps due that day; red if any is unfinished and the day has passed.
+    const due = dues.get(key) || [];
+    const late = due.some((n) => statusOf(n) !== 'done') && view.today && key < view.today;
+    const badge = due.length ? `<span class="cal-due${late ? ' overdue' : ''}" title="${due.length} target${due.length > 1 ? 's' : ''}">⚑ ${due.length}</span>` : '';
     html += `<button type="button" class="${cls}" data-action="day" data-day="${key}">`
-      + `<span class="cal-num">${d.getDate()}</span>${ms ? `<span class="cal-dur">${fmtDur(ms)}</span>` : ''}</button>`;
+      + `<span class="cal-top"><span class="cal-num">${d.getDate()}</span>${badge}</span>`
+      + `${ms ? `<span class="cal-dur">${fmtDur(ms)}</span>` : ''}</button>`;
   }
   return html;
 }
@@ -409,8 +452,21 @@ function renderDay(tree, key) {
 
   const options = [];
   walk(tree.nodes, (n, depth) => options.push(`<option value="${esc(n.id)}">${'  '.repeat(depth)}${esc(n.label)}</option>`));
+  // Targets: steps due this day, plus a form to set a target date on any step.
+  const due = dueByDay(tree).get(key) || [];
+  html += '<h4>Targets</h4>';
+  html += due.length
+    ? '<ul class="day-due">' + due.map((n) => `<li class="${statusOf(n) === 'done' ? 'done' : ''}">`
+      + `<span class="mini-dot s-${statusOf(n)}"></span><span class="lbl">${esc(n.label)}</span>`
+      + `<button type="button" class="x" data-action="del-due" data-id="${esc(n.id)}" title="Remove target">×</button></li>`).join('') + '</ul>'
+    : '<p class="none">No targets this day.</p>';
   if (options.length) {
-    html += `<form class="manual" data-day="${key}"><h4>Add time manually</h4>`
+    html += `<form class="manual due" data-day="${key}"><select name="node">${options.join('')}</select>`
+      + `<button type="submit">Set target</button></form>`;
+  }
+
+  if (options.length) {
+    html += `<form class="manual time" data-day="${key}"><h4>Add time manually</h4>`
       + `<select name="node">${options.join('')}</select>`
       + `<input name="min" type="number" min="1" max="1440" placeholder="minutes" required>`
       + `<button type="submit">Add</button></form>`;
@@ -434,11 +490,12 @@ const TAB_KEY = 'roadmap-tree:tab';
 const now = new Date();
 
 const state = {
-  tree: null,
+  projects: [],     // every project (each is a tree: { id, title, nodes, log })
+  tree: null,       // the active project, one of `projects`
   collapsed: new Set(),
   dirty: false,
-  fileHandle: null, // File System Access handle, once the user opens/saves a file
-  timer: null,      // running timer: { nodeId, label, start }; survives reloads via localStorage
+  fileHandle: null, // File System Access handle, once the user saves to a chosen file (browser only)
+  timer: null,      // running timer: { projectId, nodeId, label, start }; survives reloads via localStorage
   tab: 'tree',      // 'tree' | 'calendar'
   selected: null,   // id of the step whose notes are open
   noteMode: 'view', // 'view' | 'edit'
@@ -460,14 +517,34 @@ async function init() {
   const draft = store.get(DRAFT_KEY);
   if (draft) {
     try {
-      state.tree = normalize(JSON.parse(draft));
+      setWorkspace(normalizeWorkspace(JSON.parse(draft)));
       state.dirty = true;
       toast('Restored unsaved changes');
     } catch { store.del(DRAFT_KEY); }
   }
   if (!state.tree) await loadFromDisk();
+  if (state.timer && !state.timer.projectId) state.timer.projectId = state.tree.id; // timers from older versions
   bindEvents();
   update();
+}
+
+/** Make `{ projects, active }` (from normalizeWorkspace) the current state. */
+function setWorkspace(ws) {
+  state.projects = ws.projects;
+  state.tree = ws.active;
+  state.selected = null;
+}
+
+/** What gets written to disk: a lone project as-is (opens anywhere), several as a workspace. */
+function fileDoc() {
+  return state.projects.length === 1
+    ? state.projects[0]
+    : { version: 2, active: state.tree.id, projects: state.projects };
+}
+
+/** What the localStorage draft holds: always the whole workspace. */
+function draftDoc() {
+  return { version: 2, active: state.tree.id, projects: state.projects };
 }
 
 /** Load the tree from the open file handle, or fetch ./roadmap.json. */
@@ -480,12 +557,12 @@ async function loadFromDisk() {
       if (!res.ok) throw new Error(res.status);
       text = await res.text();
     }
-    state.tree = normalize(JSON.parse(text));
+    setWorkspace(normalizeWorkspace(JSON.parse(text)));
     state.dirty = false;
     $('loadError').hidden = true;
   } catch (err) {
     console.warn('Could not load roadmap.json:', err);
-    state.tree = state.tree || { title: 'Roadmap', nodes: [] };
+    if (!state.tree) setWorkspace(normalizeWorkspace({ title: 'Roadmap', nodes: [] }));
     $('loadError').hidden = false;
   }
 }
@@ -496,9 +573,11 @@ function update() {
   document.title = `${tree.title} · roadmap-tree`;
   $('title').textContent = tree.title;
 
+  const running = state.timer && state.timer.projectId === tree.id ? state.timer.nodeId : null;
   $('tree').innerHTML = tree.nodes.length
-    ? render(tree, { collapsed: state.collapsed, running: state.timer && state.timer.nodeId, spent: spentByNode(tree), selected: state.selected })
+    ? render(tree, { collapsed: state.collapsed, running, spent: spentByNode(tree), selected: state.selected, today: dayKey(Date.now()) })
     : '';
+  renderTabs();
 
   $('emptyState').hidden = tree.nodes.length > 0 || !$('loadError').hidden;
 
@@ -509,7 +588,8 @@ function update() {
   $('treeActions').hidden = cal;
   document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
   if (cal) renderCal();
-  updateTimerChip();
+  tickTimer();
+  refreshTip();
 
   const p = progress(tree);
   $('progressFill').style.width = p.pct + '%';
@@ -558,6 +638,7 @@ function renderNotePane() {
   walk(state.tree.nodes, (n, _d, _p, path) => { if (n.id === hit.node.id) crumb = path.join(' / '); });
   $('noteTitle').textContent = hit.node.label || '(untitled)';
   $('noteCrumb').textContent = crumb;
+  if (document.activeElement !== $('noteDue')) $('noteDue').value = hit.node.due || '';
 
   const editing = state.noteMode === 'edit';
   $('notePane').classList.toggle('editing', editing);
@@ -607,7 +688,7 @@ function startTimer(id) {
   const hit = findNode(state.tree, id);
   if (!hit) return;
   if (state.timer) stopTimer();
-  state.timer = { nodeId: id, label: hit.node.label, start: Date.now() };
+  state.timer = { projectId: state.tree.id, nodeId: id, label: hit.node.label, start: Date.now() };
   store.set(TIMER_KEY, JSON.stringify(state.timer));
   // Working on something means it's in progress.
   if (statusOf(hit.node) === 'planned') commit(() => { hit.node.status = 'active'; });
@@ -621,28 +702,55 @@ function stopTimer() {
   state.timer = null;
   store.del(TIMER_KEY);
   const end = Date.now();
-  if (end - t.start >= 1000) {
-    const hit = findNode(state.tree, t.nodeId);
-    commit((tree) => tree.log.push({ id: newLogId(), node: t.nodeId, label: hit ? hit.node.label : t.label, start: t.start, end }));
+  // The session belongs to the project the timer was started in, even if another tab is open now.
+  const owner = state.projects.find((p) => p.id === t.projectId);
+  if (owner && end - t.start >= 1000) {
+    const hit = findNode(owner, t.nodeId);
+    commit((tree) => tree.log.push({ id: newLogId(), node: t.nodeId, label: hit ? hit.node.label : t.label, start: t.start, end }), owner);
   } else update();
 }
 
-/** Show/hide the top-bar timer chip. */
-function updateTimerChip() {
+/** Once a second: keep the window title and any open hover tip ticking (no re-render). */
+function tickTimer() {
   const t = state.timer;
-  $('timerChip').hidden = !t;
-  if (!t) { document.title = `${state.tree.title} · roadmap-tree`; return; }
-  const hit = findNode(state.tree, t.nodeId);
-  $('timerLabel').textContent = hit ? hit.node.label : t.label;
-  tickTimer();
+  document.title = t
+    ? `● ${fmtClock(Date.now() - t.start)} · ${t.label}`
+    : `${state.tree.title} · roadmap-tree`;
+  fillTip();
 }
 
-/** Once a second: refresh the clock text only (no full re-render). */
-function tickTimer() {
-  if (!state.timer) return;
-  const clock = fmtClock(Date.now() - state.timer.start);
-  $('timerClock').textContent = clock;
-  document.title = `● ${clock} · ${$('timerLabel').textContent}`;
+/* ---- timer hover tip: shows the running time (or time tracked) next to the ▶ / ■ button ---- */
+
+let tipTarget = null; // { id } of the step whose timer button is hovered
+
+function tipText(id) {
+  const t = state.timer;
+  const spent = spentByNode(state.tree).get(id) || 0;
+  if (t && t.projectId === state.tree.id && t.nodeId === id) {
+    return `Running ${fmtClock(Date.now() - t.start)}` + (spent >= MIN ? ` · ${fmtDur(spent)} before` : '') + ' · click to stop';
+  }
+  return spent >= MIN ? `${fmtDur(spent)} tracked · click to start` : 'Click to start the timer';
+}
+
+/** Update the tip's text and position beside its button (hides it if the button is gone). */
+function fillTip() {
+  const tip = $('tip');
+  const el = tipTarget && $('tree').querySelector(`.rt-node[data-id="${CSS.escape(tipTarget.id)}"] [data-action="timer"]`);
+  if (!el) { tip.hidden = true; return; }
+  tip.textContent = tipText(tipTarget.id);
+  tip.hidden = false;
+  const r = el.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(r.left - 8, innerWidth - tip.offsetWidth - 8)) + 'px';
+  tip.style.top = Math.max(8, r.top - tip.offsetHeight - 6) + 'px';
+}
+
+/** After a re-render the pointer may no longer be over the button; drop the tip unless it is. */
+function refreshTip() {
+  if (!tipTarget) return;
+  requestAnimationFrame(() => {
+    const el = $('tree').querySelector(`.rt-node[data-id="${CSS.escape(tipTarget.id)}"] [data-action="timer"]`);
+    if (el && el.matches(':hover')) fillTip(); else { tipTarget = null; $('tip').hidden = true; }
+  });
 }
 
 /** Side panel: active leaves, then the next planned ones. */
@@ -650,7 +758,7 @@ function renderNext(tree) {
   const { active, planned } = whatsNext(tree);
   const item = ({ node, path }) =>
     `<li data-id="${esc(node.id)}"><span class="mini-dot s-${statusOf(node)}"></span>`
-    + `<span>${esc(node.label)}${path.length ? `<span class="crumb">${esc(path.join(' / '))}</span>` : ''}</span></li>`;
+    + `<span>${esc(node.label)}${path.length || node.due ? `<span class="crumb">${esc(path.join(' / '))}${node.due ? `${path.length ? ' · ' : ''}target ${esc(fmtDue(node.due))}` : ''}</span>` : ''}</span></li>`;
   let html = '<h3>In progress</h3>';
   html += active.length ? `<ul>${active.map(item).join('')}</ul>` : '<p class="none">Nothing active. Click a dot to start something.</p>';
   html += '<h3>Up next</h3>';
@@ -659,8 +767,8 @@ function renderNext(tree) {
 }
 
 /** Apply a data change: mutate, mark dirty, keep a draft, re-render. */
-function commit(mutate) {
-  mutate(state.tree);
+function commit(mutate, tree = state.tree) {
+  mutate(tree);
   markDirty();
   update();
 }
@@ -668,7 +776,53 @@ function commit(mutate) {
 /** Flag unsaved changes and keep the draft in localStorage. */
 function markDirty() {
   state.dirty = true;
-  store.set(DRAFT_KEY, JSON.stringify(state.tree));
+  store.set(DRAFT_KEY, JSON.stringify(draftDoc()));
+}
+
+/* ---- projects (tabs) ---- */
+
+/** Draw the project tabs; a green dot marks the project with a running timer. */
+function renderTabs() {
+  const t = state.timer;
+  $('projectTabs').innerHTML = state.projects.map((p) =>
+    `<button type="button" class="ptab${p.id === state.tree.id ? ' on' : ''}" data-pid="${esc(p.id)}" title="Double-click to rename">`
+    + (t && t.projectId === p.id ? '<span class="tdot" title="Timer running"></span>' : '')
+    + `<span class="ptitle">${esc(p.title || 'Untitled')}</span>`
+    + `<span class="pclose" data-close="${esc(p.id)}" title="Delete this project">×</span></button>`).join('')
+    + '<button type="button" class="ptab-add" id="addProject" title="New project">+</button>';
+}
+
+function switchProject(id) {
+  const p = state.projects.find((x) => x.id === id);
+  if (!p || p === state.tree) return;
+  state.tree = p;
+  state.selected = null;
+  update();
+}
+
+/** New empty project; its title opens for renaming straight away. */
+function addProject() {
+  const p = { id: newProjectId(), title: `Project ${state.projects.length + 1}`, nodes: [], log: [] };
+  state.projects.push(p);
+  state.tree = p;
+  state.selected = null;
+  markDirty();
+  update();
+  startTitleEdit();
+}
+
+/** Delete a project and everything in it, after confirmation. At least one always remains. */
+function closeProject(id) {
+  const p = state.projects.find((x) => x.id === id);
+  if (!p) return;
+  if (state.projects.length === 1) { toast('Keep at least one project.'); return; }
+  if (!confirm(`Delete the project "${p.title}" with all its steps, notes and tracked time?\n\nUse "Save as…" first if you want a copy.`)) return;
+  if (state.timer && state.timer.projectId === id) stopTimer();
+  const i = state.projects.indexOf(p);
+  state.projects.splice(i, 1);
+  if (state.tree === p) { state.tree = state.projects[Math.min(i, state.projects.length - 1)]; state.selected = null; }
+  markDirty();
+  update();
 }
 
 function saveView() {
@@ -713,7 +867,7 @@ function onTreeClick(e) {
       toggleBranch(id);
       break;
     case 'timer':
-      if (state.timer && state.timer.nodeId === id) stopTimer(); else startTimer(id);
+      if (state.timer && state.timer.projectId === state.tree.id && state.timer.nodeId === id) stopTimer(); else startTimer(id);
       break;
     case 'up':
     case 'down': {
@@ -741,7 +895,7 @@ function onTreeClick(e) {
       const n = hit.node;
       const extra = hasKids(n) ? ' and everything under it' : '';
       if (!confirm(`Delete "${n.label}"${extra}?`)) return;
-      if (state.timer && state.timer.nodeId === id) stopTimer();
+      if (state.timer && state.timer.projectId === state.tree.id && state.timer.nodeId === id) stopTimer();
       if (state.selected && containsId(n, state.selected)) state.selected = null;
       commit(() => { hit.siblings.splice(hit.siblings.indexOf(n), 1); });
       break;
@@ -871,9 +1025,47 @@ function startRename(id, selectAll = false) {
   input.addEventListener('blur', () => finish(true));
 }
 
-/** Save: File System Access API when available, otherwise download a file. */
+const JSON_TYPES = [{ description: 'Roadmap JSON', accept: { 'application/json': ['.json'] } }];
+
+/** Trigger a browser download (the desktop app shows its own Save dialog for this). */
+function downloadText(text, name) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * "Save as…": write the open project to a file you choose, as a standalone
+ * .json you can keep, share, or Import on another PC. Leaves the app's own
+ * data and the unsaved-changes state alone.
+ */
+async function saveAs() {
+  const t = state.tree;
+  const text = JSON.stringify(t, null, 2) + '\n';
+  const name = (t.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'roadmap') + '.json';
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: name, types: JSON_TYPES });
+      const w = await h.createWritable();
+      await w.write(text);
+      await w.close();
+      toast(`Saved a copy to ${h.name}`);
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // cancelled
+      console.warn('File picker failed, falling back to download:', err);
+    }
+  }
+  downloadText(text, name);
+  toast(`Saved ${name}`);
+}
+
+/** Save: the desktop app writes its data file; browsers write the chosen file, or download. */
 async function save() {
-  const text = JSON.stringify(state.tree, null, 2) + '\n';
+  const text = JSON.stringify(fileDoc(), null, 2) + '\n';
 
   // Desktop app: its built-in server writes straight to the app-data file.
   if (IS_DESKTOP) {
@@ -905,12 +1097,7 @@ async function save() {
     }
   }
 
-  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-  const a = Object.assign(document.createElement('a'), { href: url, download: 'roadmap.json' });
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadText(text, 'roadmap.json');
   markSaved('Downloaded roadmap.json — replace the project copy with it');
 }
 
@@ -921,30 +1108,34 @@ function markSaved(msg) {
   toast(msg);
 }
 
-/** Open a roadmap.json via the file picker (keeps the handle so Save writes back silently). */
-async function openFile() {
+/**
+ * Import a .json file as a new project tab (a file with several projects adds
+ * them all). Works with files made by "Save as…" or the older single roadmap.json.
+ */
+async function importFile() {
   try {
     let text;
     if (window.showOpenFilePicker) {
-      const [handle] = await window.showOpenFilePicker({
-        types: [{ description: 'Roadmap JSON', accept: { 'application/json': ['.json'] } }],
-      });
-      state.fileHandle = handle;
+      const [handle] = await window.showOpenFilePicker({ types: JSON_TYPES });
       text = await (await handle.getFile()).text();
     } else {
       text = await pickFileFallback();
       if (text == null) return;
     }
-    if (state.dirty && !confirm('Discard unsaved changes and open this file?')) return;
-    state.tree = normalize(JSON.parse(text));
-    state.dirty = false;
-    store.del(DRAFT_KEY);
+    const ws = normalizeWorkspace(JSON.parse(text));
+    for (const p of ws.projects) if (state.projects.some((q) => q.id === p.id)) p.id = newProjectId();
+    // A blank placeholder project (e.g. after a failed load) is replaced, not kept as an empty tab.
+    if (state.projects.length === 1 && !state.tree.nodes.length && !state.tree.log.length) state.projects = [];
+    state.projects.push(...ws.projects);
+    state.tree = ws.active;
+    state.selected = null;
     $('loadError').hidden = true;
+    markDirty();
     update();
-    toast('Opened');
+    toast(ws.projects.length > 1 ? `Imported ${ws.projects.length} projects` : `Imported "${ws.active.title}"`);
   } catch (err) {
     if (err.name === 'AbortError') return;
-    alert('Could not open file: ' + err.message);
+    alert('Could not import file: ' + err.message);
   }
 }
 
@@ -991,6 +1182,29 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+/** Rename the open project in place (its title above the tree); Enter/blur saves, Esc cancels. */
+function startTitleEdit() {
+  const el = $('title');
+  const before = state.tree.title;
+  el.contentEditable = 'true';
+  el.focus();
+  getSelection().selectAllChildren(el);
+  const finish = (keep) => {
+    el.removeEventListener('blur', onBlur);
+    el.removeEventListener('keydown', onKey);
+    el.contentEditable = 'false';
+    const v = el.textContent.trim();
+    if (keep && v && v !== before) commit((t) => { t.title = v; }); else update();
+  };
+  const onBlur = () => finish(true);
+  const onKey = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') finish(false);
+  };
+  el.addEventListener('blur', onBlur);
+  el.addEventListener('keydown', onKey);
+}
+
 function bindEvents() {
   const tree = $('tree');
   tree.addEventListener('click', onTreeClick);
@@ -1030,8 +1244,42 @@ function bindEvents() {
   $('expandAll').onclick = () => { state.collapsed.clear(); saveView(); update(); };
   $('collapseAll').onclick = () => { state.collapsed = new Set(branchIds(state.tree)); saveView(); update(); };
   $('saveBtn').onclick = save;
-  $('openBtn').onclick = openFile;
+  $('saveAsBtn').onclick = saveAs;
+  $('importBtn').onclick = importFile;
   $('discardBtn').onclick = discard;
+
+  // Project tabs: click to switch, double-click to rename, × to delete, + to add.
+  $('projectTabs').addEventListener('click', (e) => {
+    const close = e.target.closest('[data-close]');
+    if (close) { closeProject(close.dataset.close); return; }
+    if (e.target.closest('#addProject')) { addProject(); return; }
+    const tab = e.target.closest('[data-pid]');
+    if (tab) switchProject(tab.dataset.pid);
+  });
+  $('projectTabs').addEventListener('dblclick', (e) => {
+    if (!e.target.closest('[data-close]') && e.target.closest('[data-pid]')) startTitleEdit();
+  });
+
+  // Timer hover tip: live time beside the ▶ / ■ button.
+  tree.addEventListener('pointerover', (e) => {
+    const b = e.target.closest('[data-action="timer"]');
+    if (!b) return;
+    tipTarget = { id: b.closest('.rt-node').dataset.id };
+    fillTip();
+  });
+  tree.addEventListener('pointerout', (e) => {
+    const from = e.target.closest('[data-action="timer"]');
+    const to = e.relatedTarget && e.relatedTarget.closest ? e.relatedTarget.closest('[data-action="timer"]') : null;
+    if (from && !to) { tipTarget = null; $('tip').hidden = true; }
+  });
+
+  // Target date for the open step.
+  $('noteDue').addEventListener('change', () => {
+    const hit = findNode(state.tree, state.selected);
+    if (!hit) return;
+    const v = $('noteDue').value;
+    commit(() => { if (v) hit.node.due = v; else delete hit.node.due; });
+  });
 
   // Add a top-level (main) step; the per-row "+" only adds children.
   const addRoot = () => {
@@ -1051,32 +1299,10 @@ function bindEvents() {
     $('appVer').textContent = '(web)';
   }
 
-  // Double-click the title to rename the roadmap; Enter or blur saves, Esc cancels.
-  $('title').addEventListener('dblclick', () => {
-    const el = $('title');
-    const before = state.tree.title;
-    el.contentEditable = 'true';
-    el.focus();
-    getSelection().selectAllChildren(el);
-    const finish = (keep) => {
-      el.removeEventListener('blur', onBlur);
-      el.removeEventListener('keydown', onKey);
-      el.contentEditable = 'false';
-      const v = el.textContent.trim();
-      if (keep && v && v !== before) commit((t) => { t.title = v; }); else update();
-    };
-    const onBlur = () => finish(true);
-    const onKey = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-      else if (e.key === 'Escape') finish(false);
-    };
-    el.addEventListener('blur', onBlur);
-    el.addEventListener('keydown', onKey);
-  });
+  $('title').addEventListener('dblclick', startTitleEdit);
 
-  // Tabs, timer chip, calendar navigation.
+  // View tabs and calendar navigation.
   document.querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => setTab(b.dataset.tab); });
-  $('timerStop').onclick = stopTimer;
   $('calPrev').onclick = () => shiftMonth(-1);
   $('calNext').onclick = () => shiftMonth(1);
   $('calToday').onclick = () => {
@@ -1095,12 +1321,21 @@ function bindEvents() {
   });
   $('calDay').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action="del-entry"]');
-    if (!btn) return;
-    commit((tree) => { tree.log = tree.log.filter((x) => x.id !== btn.dataset.eid); });
+    if (btn) { commit((tree) => { tree.log = tree.log.filter((x) => x.id !== btn.dataset.eid); }); return; }
+    const del = e.target.closest('[data-action="del-due"]');
+    const hit = del && findNode(state.tree, del.dataset.id);
+    if (hit) commit(() => { delete hit.node.due; });
   });
   $('calDay').addEventListener('submit', (e) => {
     e.preventDefault();
     const f = e.target;
+    if (f.classList.contains('due')) { // set a target date for the chosen step on this day
+      const target = findNode(state.tree, f.node.value);
+      if (!target) return;
+      commit(() => { target.node.due = f.dataset.day; });
+      toast(`Target set: "${target.node.label}" by ${fmtDue(f.dataset.day)}`);
+      return;
+    }
     const minutes = Math.round(Number(f.min.value));
     if (!(minutes > 0)) return;
     const node = findNode(state.tree, f.node.value);

@@ -39,6 +39,29 @@ Then open <http://localhost:8000> in Chrome or Edge.
 | Jump to an item | Click it in **What's next** |
 | Save | **Save** or Ctrl+S |
 
+## Projects, saving and opening elsewhere
+
+- **Project tabs** sit above the toolbar. Click a tab to switch, double-click
+  to rename, **+** for a new project, **×** to delete one (it asks first).
+  Each project has its own steps, notes, calendar and time log.
+- **Save** keeps everything (all projects) in the app's own data file; use it
+  often. The **Save •** dot means there are unsaved changes.
+- **Save as…** writes the open project to a `.json` file you choose, for
+  backup, sharing, or moving to another PC. It doesn't change the app's data.
+- **Import…** adds a project from such a file as a new tab. It also accepts
+  an older single `roadmap.json`, and files holding several projects.
+
+## Timer, targets and the calendar
+
+- Hover a step and click **▶** to start its timer; click **■** to stop. Hover
+  the button to see the live running time (or the time tracked so far). The
+  window title also shows the running clock, and a green dot marks the project
+  tab that has a timer running.
+- A **target date** is the day you want a step finished. Set it from the
+  notes pane (**Target** date box), or open the **Calendar**, click a day, and
+  use **Set target** there. Targets show as `target Oct 5` on the step (red if
+  overdue and not done), as ⚑ on the calendar day, and in **What's next**.
+
 ## Notes (Markdown and LaTeX)
 
 Click a step's label to open its notes in the pane next to the tree. A step
@@ -58,8 +81,8 @@ Drag any step, by its row or the ≡ handle, to move it; ↑/↓ also work.
 
 ## Time tracking and calendar
 
-- Hover a row and click **▶** to start a timer on it; click **■** (or **Stop**
-  in the top bar) to stop. Starting another task stops the current one.
+- Hover a row and click **▶** to start a timer on it; click **■** to stop.
+  Starting another task stops the current one.
   Starting a planned task also marks it active.
 - A running timer survives a refresh or closing the tab; it keeps counting
   from the original start time.
