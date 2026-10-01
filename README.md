@@ -62,6 +62,32 @@ Then open <http://localhost:8000> in Chrome or Edge.
   use **Set target** there. Targets show as `target Oct 5` on the step (red if
   overdue and not done), as ⚑ on the calendar day, and in **What's next**.
 
+## Aquarium
+
+Click **Aquarium** at the top to open a small pixel fish tank. Drag it by its
+title bar anywhere in the window; it remembers where you left it. It costs
+almost nothing: a tiny canvas redrawn about 10 times a second, and the
+animation stops entirely while the tank is closed, minimized or the window
+is hidden.
+
+- **Quests earn pearls:** finishing a step pays 1 pearl (once per step, even
+  if you toggle it again), and every 30 minutes of tracked time pays 1 more.
+  Time and steps already done before you first open the aquarium don't count.
+- **Shop:** spend pearls on fish, from Common (2) to Legendary (40). The tank
+  holds at most 7; release a fish to make room (no refund).
+- **Feeding:** **Feed** drops pellets. You can store 3 feeds, and one comes
+  back every 30 minutes. Eating makes fish grow: baby, juvenile, adult.
+- Fish never die. If they go a day without eating they look sleepy and slow.
+- The tank is saved separately from your projects, so it survives updates but
+  is not part of "Save as…" files.
+
+## What's new
+
+After an update, the app shows what changed once. Reopen it any time from
+the **What's new** link at the top. The text comes from `changelog.json`;
+add an entry (`version`, `title`, `items` with a `tag` of `new`, `improved`
+or `fixed`) before tagging each release.
+
 ## Notes (Markdown and LaTeX)
 
 Click a step's label to open its notes in the pane next to the tree. A step

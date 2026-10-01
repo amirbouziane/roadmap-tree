@@ -1,0 +1,26 @@
+[
+  {
+    "version": "0.3.0",
+    "date": "2026-10-01",
+    "title": "Projects, targets and an aquarium",
+    "items": [
+      { "tag": "new", "text": "Project tabs: keep several roadmaps side by side. Double-click a tab to rename it." },
+      { "tag": "new", "text": "Save as… saves the open project to a file you can open anywhere, and Import… adds a project from a file." },
+      { "tag": "new", "text": "Target dates: set a finish day for a step in its notes, or click a day in the Calendar. Overdue steps turn red." },
+      { "tag": "new", "text": "Aquarium: a small pixel fish tank you can drag around. Finish steps and track time to earn pearls, then trade them for rarer fish (up to 7)." },
+      { "tag": "new", "text": "This What's new window, shown after each update. Open it any time from the link at the top." },
+      { "tag": "improved", "text": "The timer no longer takes space at the top. Hover the ▶ / ■ button next to a step to see the running time." }
+    ]
+  },
+  {
+    "version": "0.2.2",
+    "title": "Earlier highlights",
+    "items": [
+      { "tag": "new", "text": "Click a step to open its notes. They support Markdown and LaTeX math like Obsidian." },
+      { "tag": "new", "text": "Drag any step to reorder it, or use the ↑ / ↓ buttons." },
+      { "tag": "new", "text": "Check for updates button, and the app version next to the name." },
+      { "tag": "new", "text": "+ Add main step for top-level steps, and a small example tree on first run." },
+      { "tag": "improved", "text": "Collapse or expand a branch with its chevron; the label now opens notes." }
+    ]
+  }
+]
