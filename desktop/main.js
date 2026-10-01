@@ -19,7 +19,10 @@ const TYPES = {
   '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript',
   '.json': 'application/json', '.woff2': 'font/woff2',
 };
-const STATIC = new Set(['index.html', 'styles.css', 'app.js', 'markdown.js', 'aquarium.js', 'changelog.json']);
+const STATIC = new Set([
+  'index.html', 'styles.css', 'app.js', 'markdown.js', 'aquarium.js', 'changelog.json',
+  'library.js', 'board.js', 'graph.js', 'planner.js', 'share.js',
+]);
 
 let dataFile;
 
@@ -120,7 +123,7 @@ async function createWindow() {
   const win = new BrowserWindow({ width: 1100, height: 720, autoHideMenuBar: true, title: 'Roadmap Tree' });
   win.loadURL(origin);
   // Links in notes open in the normal browser (web links only), never inside the app window.
-  const openWeb = (url) => { if (/^https?:\/\//i.test(url)) shell.openExternal(url); };
+  const openWeb = (url) => { if (/^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url); };
   win.webContents.setWindowOpenHandler(({ url }) => { openWeb(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', (ev, url) => {
     if (!url.startsWith(origin)) { ev.preventDefault(); openWeb(url); }

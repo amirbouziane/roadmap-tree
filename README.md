@@ -72,7 +72,59 @@ Then open <http://localhost:8000> in Chrome or Edge.
   use **Set target** there. Targets show as `target Oct 5` on the step (red if
   overdue and not done), as ⚑ on the calendar day, and in **What's next**.
 
-## Aquarium
+## Graph, whiteboard, planner and library
+
+- **Graph:** the open project as dots joined to their parents, like Obsidian.
+  Drag a dot and the web follows; scroll to zoom; drag the background to pan;
+  click a dot to jump to that step. Green = done or in progress, hollow =
+  planned, red or orange ring = overdue or due soon. A note that mentions
+  another step as `[[its name]]` adds a dashed line between them. The physics
+  stops once the web settles.
+- **Board:** a corkboard with sticky notes. Double-click the board (or
+  **+ Note**) to add one, drag it by its top edge, resize from the corner,
+  recolour with the dots, delete with ×. There is one board per project and a
+  **General** board shared by all projects.
+- **Calendar planner** (under the month grid): book a step into a **Morning,
+  Afternoon or Evening**, for one day or repeated across a range of days.
+  Drag a block to another slot or day. When a slot passes with its step
+  unfinished, the block is listed as missed with a suggested next free slot
+  (one click to accept), or you can mark it done or skip it. Today's plan also
+  shows in the sidebar.
+- **Library:** saved links (title, address, optional note), per project or in
+  a general shelf. Only http, https and mailto links are accepted. Passwords
+  are deliberately not stored, because project files are plain text.
+- The general shelf and general board live in the workspace file (written when
+  they have content); **Save as…** exports a single project without them.
+
+## Settings
+
+The **Settings** tab holds the theme (system, light or dark), how many days
+before a target a step turns orange, whether project tabs sort themselves by
+urgency or stay where you drag them, and your companion. They are stored on
+this computer only.
+
+## Companion: aquarium or jungle
+
+Pick **one** in Settings: Aquarium, Jungle, or Off. Each habitat keeps its own
+pets and food; pearls are one shared pool, so switching never loses anything.
+
+**Auto-hiding frame:** after 3 seconds with the mouse away, the title bar,
+buttons and border fade out and only the scene stays, so it looks part of the
+app. Hover over it and they come back at once. The frame stays while the shop
+is open, while you drag, and while a button has keyboard focus. Turn it off
+with **Frame → Always show** in Settings.
+
+**Jungle:** animals (tree frog, parrot, monkey, toucan, sloth, jaguar) that
+hop, walk or fly around a jungle scene. Fruit falls to the ground and they eat
+it and grow, just like the fish.
+
+**Aquarium enclosures and decorations:** in the shop you can switch between
+the **Classic** scene and a **Glass cube**, a realistic square tank with a lid
+light and an air pump feeding an air stone. Decorations (tall plant, coral,
+air stone, driftwood, castle, treasure chest, diver statue) are bought with
+pearls and can be hidden or shown again.
+
+### The aquarium basics
 
 Click **Aquarium** at the top to open a small pixel fish tank. Drag it by its
 title bar anywhere in the window; it remembers where you left it. It costs
@@ -85,11 +137,35 @@ is hidden.
   Time and steps already done before you first open the aquarium don't count.
 - **Shop:** spend pearls on fish, from Common (2) to Legendary (40). The tank
   holds at most 7; release a fish to make room (no refund).
-- **Feeding:** **Feed** drops pellets. You can store 3 feeds, and one comes
-  back every 30 minutes. Eating makes fish grow: baby, juvenile, adult.
+- **Feeding:** the **Food** bar shows up to 3 stored feeds; one fills back every
+  30 minutes. Move the mouse over the scene and the pets swim over to you, as
+  if expecting food. **Click** where you want the food to land and a few
+  pellets drop right there (one feed each). Eating makes pets grow: baby,
+  juvenile, adult.
+- **Names:** every pet can have a name. A new pet opens a name box straight
+  away (you can skip it), and **Rename** in the shop changes it any time
+  (Enter saves, Esc cancels; empty goes back to the species name). Hover a pet
+  to see its name.
 - Fish never die. If they go a day without eating they look sleepy and slow.
 - The tank is saved separately from your projects, so it survives updates but
   is not part of "Save as…" files.
+
+## Share the app and leave feedback
+
+Click **Share & feedback** at the top (or in Settings → About).
+
+- **Share:** copy the download link (the project's Releases page), copy a
+  ready-made message to paste anywhere, open a pre-written email to a friend,
+  or star the project on GitHub.
+- **Feedback:** choose Idea, Bug, Question or Praise, write your message, and
+  press **Send on GitHub**. That opens a pre-filled issue in your browser; you
+  read it and submit it there (a free GitHub account is needed). Or press
+  **Copy feedback** and send it however you like. Nothing is sent
+  automatically, and no project data is ever included. An optional line with
+  the app version and your operating system can be switched off.
+- For people without a GitHub account, set `CONTACT.form` (a link to a feedback
+  form) and/or `CONTACT.email` at the top of `share.js`. They are empty by
+  default because that file is public.
 
 ## What's new
 
