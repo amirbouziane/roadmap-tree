@@ -13,6 +13,7 @@
   --btn-bg: #ffffff;
   --btn-hover: #f4f5f7;
   --danger: #cf222e;
+  --orange: #c9610a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,6 +30,7 @@
     --btn-bg: #0f1115;
     --btn-hover: #1a1e24;
     --danger: #f85149;
+    --orange: #f0883e;
   }
 }
 
@@ -401,10 +403,66 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
   white-space: nowrap;
 }
 
-.rt-due.overdue { fill: var(--danger); }
+/* deadline urgency: red = overdue, orange = due within 5 days */
+.rt-due.overdue { fill: var(--danger); font-weight: 600; }
+.rt-due.soon { fill: var(--orange); font-weight: 600; }
+.rt-urg.overdue { fill: var(--danger); }
+.rt-urg.soon { fill: var(--orange); }
+
+.udot { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.udot.overdue { background: var(--danger); }
+.udot.soon { background: var(--orange); }
+
+.next .dl li { position: relative; padding-left: 14px; }
+.dl-bar { position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--border); }
+.lvl-overdue > .dl-bar { background: var(--danger); }
+.lvl-soon > .dl-bar { background: var(--orange); }
+.lvl-later > .dl-bar { background: var(--planned); }
+.next .dl .lvl-overdue .crumb { color: var(--danger); }
+.next .dl .lvl-soon .crumb { color: var(--orange); }
+
 .cal-top { display: flex; justify-content: space-between; align-items: baseline; width: 100%; gap: 4px; }
 .cal-due { font-size: 11px; color: var(--muted); }
-.cal-due.overdue { color: var(--danger); }
+.cal-due.overdue { color: var(--danger); font-weight: 600; }
+.cal-due.soon { color: var(--orange); font-weight: 600; }
+.cal-day .dur.lvl-overdue { color: var(--danger); }
+.cal-day .dur.lvl-soon { color: var(--orange); }
+
+/* overview across projects, under the calendar */
+.global { margin-top: 36px; max-width: 980px; }
+.global h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.global h3:not(:first-child) { margin-top: 28px; }
+.pcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.pcard {
+  display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 12px 14px;
+  border: 1px solid var(--border); border-left-width: 4px; border-radius: 8px; background: var(--bg);
+}
+.pcard.on { background: var(--hover); }
+.pcard.lvl-overdue { border-left-color: var(--danger); }
+.pcard.lvl-soon { border-left-color: var(--orange); }
+.pcard.lvl-later { border-left-color: var(--planned); }
+.pcard.lvl-none { border-left-color: var(--border); }
+.pc-top { display: flex; justify-content: space-between; gap: 8px; }
+.pc-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-pct { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pc-bar { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; }
+.pc-bar i { display: block; height: 100%; background: var(--green); }
+.pc-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.pc-next { color: var(--muted); font-size: 12px; }
+.chip.lvl-overdue { color: var(--danger); border-color: var(--danger); }
+.chip.lvl-soon { color: var(--orange); border-color: var(--orange); }
+
+.gl-head { margin: 16px 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.gl-head.lvl-overdue { color: var(--danger); }
+.gl-head.lvl-soon { color: var(--orange); }
+.gl { list-style: none; margin: 0; padding: 0; }
+.gl li { position: relative; display: flex; gap: 12px; align-items: baseline; padding: 6px 8px 6px 16px; border-radius: 6px; cursor: pointer; }
+.gl li:hover { background: var(--hover); }
+.gl-proj { flex: none; width: 160px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-lbl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gl-when { flex: none; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.gl .lvl-overdue .gl-when { color: var(--danger); }
+.gl .lvl-soon .gl-when { color: var(--orange); }
 .cal-cell.lv4 .cal-due { color: var(--fg); }
 .cal-day .day-due li.done .lbl { color: var(--muted); text-decoration: line-through; }
 .cal-day .mini-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; transform: translateY(-1px); }
@@ -515,9 +573,10 @@ body.is-dragging, body.is-dragging * { cursor: grabbing !important; user-select:
 .tank-bar button { flex: 1; }
 .tank-bar button:disabled, .tank-shop button:disabled { opacity: 0.45; cursor: default; }
 
+.tank-view { position: relative; }
 .tank-shop {
   position: absolute;
-  inset: 8px 8px 8px 8px;
+  inset: 0;
   overflow: auto;
   background: var(--bg);
   border: 1px solid var(--border);

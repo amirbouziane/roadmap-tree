@@ -174,6 +174,52 @@ function fmtDue(key) {
   return new Date(dayStart(key)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/* ---- deadlines: how urgent is each step's target date? ---- */
+
+const SOON_DAYS = 5; // a target within this many days counts as "soon" (orange)
+const LEVEL_RANK = { overdue: 3, soon: 2, later: 1, done: 0 };
+
+/** Whole days from `today` to `due` (both 'YYYY-MM-DD'); negative once it has passed. */
+function daysUntil(due, today) {
+  return Math.round((dayStart(due) - dayStart(today)) / 864e5);
+}
+
+/** { level, days } for a step with a target date, else null. level: done | overdue | soon | later. */
+function urgency(node, today) {
+  if (!node.due) return null;
+  const days = daysUntil(node.due, today);
+  const level = statusOf(node) === 'done' ? 'done' : days < 0 ? 'overdue' : days <= SOON_DAYS ? 'soon' : 'later';
+  return { level, days };
+}
+
+/** "today", "tomorrow", "in 4 days", "1 day overdue", "3 days overdue". */
+function fmtDays(days) {
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days > 1) return `in ${days} days`;
+  return days === -1 ? '1 day overdue' : `${-days} days overdue`;
+}
+
+/** A project's unfinished steps that have target dates, most urgent first: [{ node, path, level, days }]. */
+function deadlines(tree, today) {
+  const out = [];
+  walk(tree.nodes, (n, _d, _p, path) => {
+    const u = urgency(n, today);
+    if (u && u.level !== 'done') out.push({ node: n, path, level: u.level, days: u.days });
+  });
+  return out.sort((a, b) => a.days - b.days);
+}
+
+/** Worst level among some steps ('overdue' > 'soon' > 'later'); 'done' if none are unfinished. */
+function worstLevel(nodes, today) {
+  let worst = 'done';
+  for (const n of nodes) {
+    const u = urgency(n, today);
+    if (u && LEVEL_RANK[u.level] > LEVEL_RANK[worst]) worst = u.level;
+  }
+  return worst;
+}
+
 /* ---- time log helpers (epoch-ms entries, local-time days) ---- */
 
 const MIN = 60000;
@@ -327,7 +373,7 @@ function render(tree, view = {}) {
   // Rough width estimate so long labels aren't clipped (no text measuring here).
   let width = 320;
   for (const r of rows) {
-    const w = r.x + L.textGap + r.node.label.length * 8 + (r.node.note ? r.node.note.length * 7 + 14 : 0) + (r.node.due ? 100 : 0) + 60;
+    const w = r.x + L.textGap + r.node.label.length * 8 + (r.node.note ? r.node.note.length * 7 + 14 : 0) + (r.node.due ? 170 : 0) + 60;
     if (w > width) width = w;
   }
   const height = L.padY * 2 + rows.length * L.row;
@@ -345,7 +391,7 @@ function render(tree, view = {}) {
     }
 
     const n = r.node;
-    const isRunning = view.running === n.id;
+    const isRunning = !!(view.running && view.running.has(n.id));
     const spentMs = view.spent ? view.spent.get(n.id) || 0 : 0;
     const cls = `rt-node s-${r.status}${r.kids ? ' has-kids' : ''}${isRunning ? ' running' : ''}${view.selected === n.id ? ' selected' : ''}`;
     const tx = r.x + L.textGap;
@@ -359,14 +405,18 @@ function render(tree, view = {}) {
       g += `<rect class="rt-chev-hit" data-action="toggle" x="${cx - 6}" y="${r.y - 8}" width="12" height="16"/>`;
       g += `<path class="rt-chev" d="M-3 -1.5L0 1.5L3 -1.5" transform="translate(${cx} ${r.y}) rotate(${r.open ? 0 : -90})"/>`;
     }
+    let urgBar = ''; // coloured edge for steps that are overdue or due soon
     g += `<text class="rt-text" x="${tx}" y="${r.y}" dy="0.35em">`;
     g += `<tspan class="rt-label" data-action="label">${esc(n.label || '(untitled)')}</tspan>`;
     if (n.md) g += `<tspan class="rt-hasnote" dx="8"><title>Has notes</title>¶</tspan>`;
     if (n.note) g += `<tspan class="rt-note" dx="10">${esc(n.note)}</tspan>`;
     if (spentMs >= MIN / 2) g += `<tspan class="rt-note rt-spent" dx="10">${fmtDur(spentMs)}</tspan>`;
     if (n.due) {
-      const overdue = view.today && n.due < view.today && r.status !== 'done';
-      g += `<tspan class="rt-note rt-due${overdue ? ' overdue' : ''}" dx="10">target ${esc(fmtDue(n.due))}</tspan>`;
+      const u = view.today ? urgency(n, view.today) : null;
+      const lvl = u ? u.level : 'later';
+      const hot = lvl === 'overdue' || lvl === 'soon';
+      g += `<tspan class="rt-note rt-due ${lvl}" dx="10">target ${esc(fmtDue(n.due))}${hot ? ' · ' + esc(fmtDays(u.days)) : ''}</tspan>`;
+      if (hot) urgBar = `<rect class="rt-urg ${lvl}" x="0" y="${r.y - L.row / 2 + 3}" width="3" height="${L.row - 6}" rx="1.5"/>`;
     }
     g += `<tspan class="rt-act grip" data-action="grip" dx="12"><title>Drag to move</title>≡</tspan>`;
     g += `<tspan class="rt-act" data-action="up" dx="6"><title>Move up</title>↑</tspan>`;
@@ -374,7 +424,7 @@ function render(tree, view = {}) {
     g += `<tspan class="rt-act play" data-action="timer" dx="8">${isRunning ? '■' : '▶'}</tspan>`;
     g += `<tspan class="rt-act add" data-action="add" dx="8"><title>Add child</title>+</tspan>`;
     g += `<tspan class="rt-act del" data-action="delete" dx="8"><title>Delete</title>×</tspan>`;
-    g += `</text></g>`;
+    g += `</text>${urgBar}</g>`;
     nodes.push(g);
   }
 
@@ -413,10 +463,10 @@ function renderCalendar(tree, view) {
       + (d.getMonth() !== view.month ? ' other' : '')
       + (key === view.today ? ' today' : '')
       + (key === view.selected ? ' sel' : '');
-    // Target marker: "⚑ n" for steps due that day; red if any is unfinished and the day has passed.
+    // Target marker: "⚑ n" for steps due that day, coloured by the most urgent unfinished one.
     const due = dues.get(key) || [];
-    const late = due.some((n) => statusOf(n) !== 'done') && view.today && key < view.today;
-    const badge = due.length ? `<span class="cal-due${late ? ' overdue' : ''}" title="${due.length} target${due.length > 1 ? 's' : ''}">⚑ ${due.length}</span>` : '';
+    const lvl = worstLevel(due, view.today || key);
+    const badge = due.length ? `<span class="cal-due ${lvl}" title="${due.length} target${due.length > 1 ? 's' : ''}">⚑ ${due.length}</span>` : '';
     html += `<button type="button" class="${cls}" data-action="day" data-day="${key}">`
       + `<span class="cal-top"><span class="cal-num">${d.getDate()}</span>${badge}</span>`
       + `${ms ? `<span class="cal-dur">${fmtDur(ms)}</span>` : ''}</button>`;
@@ -456,9 +506,13 @@ function renderDay(tree, key) {
   const due = dueByDay(tree).get(key) || [];
   html += '<h4>Targets</h4>';
   html += due.length
-    ? '<ul class="day-due">' + due.map((n) => `<li class="${statusOf(n) === 'done' ? 'done' : ''}">`
+    ? '<ul class="day-due">' + due.map((n) => {
+      const u = urgency(n, dayKey(Date.now()));
+      return `<li class="${statusOf(n) === 'done' ? 'done' : ''}">`
       + `<span class="mini-dot s-${statusOf(n)}"></span><span class="lbl">${esc(n.label)}</span>`
-      + `<button type="button" class="x" data-action="del-due" data-id="${esc(n.id)}" title="Remove target">×</button></li>`).join('') + '</ul>'
+      + (u && u.level !== 'done' ? `<span class="dur lvl-${u.level}">${esc(fmtDays(u.days))}</span>` : '')
+      + `<button type="button" class="x" data-action="del-due" data-id="${esc(n.id)}" title="Remove target">×</button></li>`;
+    }).join('') + '</ul>'
     : '<p class="none">No targets this day.</p>';
   if (options.length) {
     html += `<form class="manual due" data-day="${key}"><select name="node">${options.join('')}</select>`
@@ -470,6 +524,59 @@ function renderDay(tree, key) {
       + `<select name="node">${options.join('')}</select>`
       + `<input name="min" type="number" min="1" max="1440" placeholder="minutes" required>`
       + `<button type="submit">Add</button></form>`;
+  }
+  return html;
+}
+
+/**
+ * renderGlobal(projects, today, activeId) -> HTML overview across all projects:
+ * a card per project ranked by how much attention it needs (worst deadline
+ * first), then every unfinished deadline from every project in one list.
+ */
+function renderGlobal(projects, today, activeId) {
+  const rows = projects.map((p) => {
+    const d = deadlines(p, today);
+    return {
+      p, d, pr: progress(p),
+      level: d.length ? d[0].level : 'none',
+      overdue: d.filter((x) => x.level === 'overdue').length,
+      soon: d.filter((x) => x.level === 'soon').length,
+    };
+  });
+  // Most urgent project first: worst level, then the earliest deadline.
+  rows.sort((a, b) => (LEVEL_RANK[b.level] || 0) - (LEVEL_RANK[a.level] || 0)
+    || (a.d.length ? a.d[0].days : 1e9) - (b.d.length ? b.d[0].days : 1e9));
+
+  let html = '<h3>All projects</h3><div class="pcards">';
+  html += rows.map(({ p, d, pr, level, overdue, soon }) => {
+    const next = d[0];
+    const chips = (overdue ? `<span class="chip lvl-overdue">${overdue} overdue</span>` : '')
+      + (soon ? `<span class="chip lvl-soon">${soon} due soon</span>` : '')
+      + `<span class="chip">${pr.done}/${pr.total} done</span>`;
+    return `<button type="button" class="pcard lvl-${level}${p.id === activeId ? ' on' : ''}" data-pid="${esc(p.id)}">`
+      + `<span class="pc-top"><span class="pc-name">${esc(p.title || 'Untitled')}</span><span class="pc-pct">${pr.pct}%</span></span>`
+      + `<span class="pc-bar"><i style="width:${pr.pct}%"></i></span>`
+      + `<span class="pc-meta">${chips}</span>`
+      + `<span class="pc-next">${next ? `Next: ${esc(next.node.label)} · ${esc(fmtDays(next.days))}` : 'No deadlines set'}</span></button>`;
+  }).join('') + '</div>';
+
+  const all = [];
+  for (const { p, d } of rows) for (const x of d) all.push({ p, ...x });
+  all.sort((a, b) => a.days - b.days);
+  const groups = [
+    ['overdue', 'Overdue', all.filter((x) => x.level === 'overdue')],
+    ['soon', `Due within ${SOON_DAYS} days`, all.filter((x) => x.level === 'soon')],
+    ['later', 'Later', all.filter((x) => x.level === 'later').slice(0, 10)],
+  ];
+  html += '<h3>Deadlines across projects</h3>';
+  if (!all.length) html += '<p class="none">No deadlines yet. Set a target date on a step to see it here.</p>';
+  for (const [lvl, title, items] of groups) {
+    if (!items.length) continue;
+    html += `<h4 class="gl-head lvl-${lvl}">${title}</h4><ul class="gl">`
+      + items.map((x) => `<li class="lvl-${lvl}" data-pid="${esc(x.p.id)}" data-id="${esc(x.node.id)}" title="Open this step">`
+        + `<span class="dl-bar"></span><span class="gl-proj">${esc(x.p.title || 'Untitled')}</span>`
+        + `<span class="gl-lbl">${esc(x.node.label)}</span>`
+        + `<span class="gl-when">${esc(fmtDue(x.node.due))} · ${esc(fmtDays(x.days))}</span></li>`).join('') + '</ul>';
   }
   return html;
 }
@@ -496,7 +603,7 @@ const state = {
   collapsed: new Set(),
   dirty: false,
   fileHandle: null, // File System Access handle, once the user saves to a chosen file (browser only)
-  timer: null,      // running timer: { projectId, nodeId, label, start }; survives reloads via localStorage
+  timers: [],       // running timers: [{ projectId, nodeId, label, start }]; survive reloads via localStorage
   tab: 'tree',      // 'tree' | 'calendar'
   selected: null,   // id of the step whose notes are open
   noteMode: 'view', // 'view' | 'edit'
@@ -512,7 +619,10 @@ const store = {
 /** Startup: prefer an unsaved local draft, otherwise fetch roadmap.json. */
 async function init() {
   try { state.collapsed = new Set(JSON.parse(store.get(VIEW_KEY) || '[]')); } catch { /* ignore */ }
-  try { state.timer = JSON.parse(store.get(TIMER_KEY) || 'null'); } catch { /* ignore */ }
+  try {
+    const saved = JSON.parse(store.get(TIMER_KEY) || 'null');
+    state.timers = Array.isArray(saved) ? saved : saved ? [saved] : []; // older versions stored a single timer
+  } catch { /* ignore */ }
   if (store.get(TAB_KEY) === 'calendar') state.tab = 'calendar';
 
   const draft = store.get(DRAFT_KEY);
@@ -524,7 +634,7 @@ async function init() {
     } catch { store.del(DRAFT_KEY); }
   }
   if (!state.tree) await loadFromDisk();
-  if (state.timer && !state.timer.projectId) state.timer.projectId = state.tree.id; // timers from older versions
+  state.timers.forEach((t) => { if (!t.projectId) t.projectId = state.tree.id; }); // timers from older versions
   bindEvents();
   update();
 }
@@ -574,7 +684,7 @@ function update() {
   document.title = `${tree.title} · roadmap-tree`;
   $('title').textContent = tree.title;
 
-  const running = state.timer && state.timer.projectId === tree.id ? state.timer.nodeId : null;
+  const running = new Set(state.timers.filter((t) => t.projectId === tree.id).map((t) => t.nodeId));
   $('tree').innerHTML = tree.nodes.length
     ? render(tree, { collapsed: state.collapsed, running, spent: spentByNode(tree), selected: state.selected, today: dayKey(Date.now()) })
     : '';
@@ -672,6 +782,24 @@ function renderCal() {
   $('calTotal').textContent = `${fmtDur(monthTotal(state.tree.log, year, month))} this month`;
   $('calGrid').innerHTML = renderCalendar(state.tree, { year, month, selected, today: dayKey(Date.now()) });
   $('calDay').innerHTML = renderDay(state.tree, selected);
+  $('globalView').innerHTML = renderGlobal(state.projects, dayKey(Date.now()), state.tree.id);
+}
+
+/** Jump to a step in any project: switch tab and project, expand its branch, and flash it. */
+function goToStep(pid, id) {
+  const p = state.projects.find((x) => x.id === pid);
+  if (!p) return;
+  state.tree = p;
+  state.selected = null;
+  state.tab = 'tree';
+  store.set(TAB_KEY, 'tree');
+  reveal(id);
+  update();
+  const g = $('tree').querySelector(`.rt-node[data-id="${CSS.escape(id)}"]`);
+  if (!g) return;
+  g.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  g.classList.add('flash');
+  setTimeout(() => g.classList.remove('flash'), 1400);
 }
 
 function setTab(tab) {
@@ -689,24 +817,29 @@ function shiftMonth(delta) {
 
 /* ---- timer ---- */
 
-/** Start timing a node. Any running timer is stopped (and logged) first. */
+/** The running timer for a step, if any. Several steps can be timed at once. */
+const timerFor = (projectId, nodeId) => state.timers.find((t) => t.projectId === projectId && t.nodeId === nodeId);
+
+function saveTimers() {
+  if (state.timers.length) store.set(TIMER_KEY, JSON.stringify(state.timers)); else store.del(TIMER_KEY);
+}
+
+/** Start timing a step. Timers already running keep running. */
 function startTimer(id) {
   const hit = findNode(state.tree, id);
-  if (!hit) return;
-  if (state.timer) stopTimer();
-  state.timer = { projectId: state.tree.id, nodeId: id, label: hit.node.label, start: Date.now() };
-  store.set(TIMER_KEY, JSON.stringify(state.timer));
+  if (!hit || timerFor(state.tree.id, id)) return;
+  state.timers.push({ projectId: state.tree.id, nodeId: id, label: hit.node.label, start: Date.now() });
+  saveTimers();
   // Working on something means it's in progress.
   if (statusOf(hit.node) === 'planned') commit(() => { hit.node.status = 'active'; });
   else update();
 }
 
-/** Stop the running timer and log the session (sessions under 1s are dropped). */
-function stopTimer() {
-  const t = state.timer;
-  if (!t) return;
-  state.timer = null;
-  store.del(TIMER_KEY);
+/** Stop one running timer and log its session (sessions under 1s are dropped). */
+function stopTimer(t) {
+  if (!t || !state.timers.includes(t)) return;
+  state.timers = state.timers.filter((x) => x !== t);
+  saveTimers();
   const end = Date.now();
   // The session belongs to the project the timer was started in, even if another tab is open now.
   const owner = state.projects.find((p) => p.id === t.projectId);
@@ -718,10 +851,12 @@ function stopTimer() {
 
 /** Once a second: keep the window title and any open hover tip ticking (no re-render). */
 function tickTimer() {
-  const t = state.timer;
-  document.title = t
-    ? `● ${fmtClock(Date.now() - t.start)} · ${t.label}`
-    : `${state.tree.title} · roadmap-tree`;
+  const n = state.timers.length;
+  if (!n) document.title = `${state.tree.title} · roadmap-tree`;
+  else {
+    const t = state.timers[0]; // the one running longest
+    document.title = `● ${fmtClock(Date.now() - t.start)} · ${t.label}` + (n > 1 ? ` (+${n - 1} more)` : '');
+  }
   fillTip();
 }
 
@@ -730,9 +865,9 @@ function tickTimer() {
 let tipTarget = null; // { id } of the step whose timer button is hovered
 
 function tipText(id) {
-  const t = state.timer;
+  const t = timerFor(state.tree.id, id);
   const spent = spentByNode(state.tree).get(id) || 0;
-  if (t && t.projectId === state.tree.id && t.nodeId === id) {
+  if (t) {
     return `Running ${fmtClock(Date.now() - t.start)}` + (spent >= MIN ? ` · ${fmtDur(spent)} before` : '') + ' · click to stop';
   }
   return spent >= MIN ? `${fmtDur(spent)} tracked · click to start` : 'Click to start the timer';
@@ -765,7 +900,15 @@ function renderNext(tree) {
   const item = ({ node, path }) =>
     `<li data-id="${esc(node.id)}"><span class="mini-dot s-${statusOf(node)}"></span>`
     + `<span>${esc(node.label)}${path.length || node.due ? `<span class="crumb">${esc(path.join(' / '))}${node.due ? `${path.length ? ' · ' : ''}target ${esc(fmtDue(node.due))}` : ''}</span>` : ''}</span></li>`;
-  let html = '<h3>In progress</h3>';
+  // Deadlines go first: overdue (red) and due-soon (orange) steps float to the top.
+  const dl = deadlines(tree, dayKey(Date.now())).slice(0, 8);
+  let html = '<h3>Deadlines</h3>';
+  html += dl.length
+    ? '<ul class="dl">' + dl.map((d) =>
+      `<li class="lvl-${d.level}" data-id="${esc(d.node.id)}"><span class="dl-bar"></span>`
+      + `<span>${esc(d.node.label)}<span class="crumb">${esc(fmtDue(d.node.due))} · ${esc(fmtDays(d.days))}</span></span></li>`).join('') + '</ul>'
+    : '<p class="none">No deadlines set. Add a target date in a step\'s notes or in the Calendar.</p>';
+  html += '<h3>In progress</h3>';
   html += active.length ? `<ul>${active.map(item).join('')}</ul>` : '<p class="none">Nothing active. Click a dot to start something.</p>';
   html += '<h3>Up next</h3>';
   html += planned.length ? `<ul>${planned.map(item).join('')}</ul>` : '<p class="none">Nothing planned.</p>';
@@ -789,12 +932,16 @@ function markDirty() {
 
 /** Draw the project tabs; a green dot marks the project with a running timer. */
 function renderTabs() {
-  const t = state.timer;
-  $('projectTabs').innerHTML = state.projects.map((p) =>
-    `<button type="button" class="ptab${p.id === state.tree.id ? ' on' : ''}" data-pid="${esc(p.id)}" title="Double-click to rename">`
-    + (t && t.projectId === p.id ? '<span class="tdot" title="Timer running"></span>' : '')
+  const today = dayKey(Date.now());
+  $('projectTabs').innerHTML = state.projects.map((p) => {
+    const d = deadlines(p, today);
+    const lvl = d.length ? d[0].level : null; // worst unfinished deadline
+    return `<button type="button" class="ptab${p.id === state.tree.id ? ' on' : ''}" data-pid="${esc(p.id)}" title="Double-click to rename">`
+    + (lvl === 'overdue' || lvl === 'soon' ? `<span class="udot ${lvl}" title="${lvl === 'overdue' ? 'Overdue steps' : 'Deadline within ' + SOON_DAYS + ' days'}"></span>` : '')
+    + (state.timers.some((t) => t.projectId === p.id) ? '<span class="tdot" title="Timer running"></span>' : '')
     + `<span class="ptitle">${esc(p.title || 'Untitled')}</span>`
-    + `<span class="pclose" data-close="${esc(p.id)}" title="Delete this project">×</span></button>`).join('')
+    + `<span class="pclose" data-close="${esc(p.id)}" title="Delete this project">×</span></button>`;
+  }).join('')
     + '<button type="button" class="ptab-add" id="addProject" title="New project">+</button>';
 }
 
@@ -823,7 +970,7 @@ function closeProject(id) {
   if (!p) return;
   if (state.projects.length === 1) { toast('Keep at least one project.'); return; }
   if (!confirm(`Delete the project "${p.title}" with all its steps, notes and tracked time?\n\nUse "Save as…" first if you want a copy.`)) return;
-  if (state.timer && state.timer.projectId === id) stopTimer();
+  state.timers.filter((t) => t.projectId === id).forEach(stopTimer);
   const i = state.projects.indexOf(p);
   state.projects.splice(i, 1);
   if (state.tree === p) { state.tree = state.projects[Math.min(i, state.projects.length - 1)]; state.selected = null; }
@@ -876,7 +1023,7 @@ function onTreeClick(e) {
       toggleBranch(id);
       break;
     case 'timer':
-      if (state.timer && state.timer.projectId === state.tree.id && state.timer.nodeId === id) stopTimer(); else startTimer(id);
+      { const running = timerFor(state.tree.id, id); if (running) stopTimer(running); else startTimer(id); }
       break;
     case 'up':
     case 'down': {
@@ -904,7 +1051,7 @@ function onTreeClick(e) {
       const n = hit.node;
       const extra = hasKids(n) ? ' and everything under it' : '';
       if (!confirm(`Delete "${n.label}"${extra}?`)) return;
-      if (state.timer && state.timer.projectId === state.tree.id && state.timer.nodeId === id) stopTimer();
+      state.timers.filter((t) => t.projectId === state.tree.id && containsId(n, t.nodeId)).forEach(stopTimer);
       if (state.selected && containsId(n, state.selected)) state.selected = null;
       commit(() => { hit.siblings.splice(hit.siblings.indexOf(n), 1); });
       break;
@@ -1392,6 +1539,13 @@ function bindEvents() {
     state.cal.year = y;
     state.cal.month = m - 1; // clicking a greyed day from a neighbouring month jumps there
     renderCal();
+  });
+  // Overview across projects: a card opens that project, a deadline opens that step.
+  $('globalView').addEventListener('click', (e) => {
+    const row = e.target.closest('li[data-id]');
+    if (row) { goToStep(row.dataset.pid, row.dataset.id); return; }
+    const card = e.target.closest('.pcard');
+    if (card) { switchProject(card.dataset.pid); setTab('tree'); }
   });
   $('calDay').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action="del-entry"]');

@@ -437,7 +437,12 @@
     });
 
     el.feed.onclick = feed;
-    el.shopBtn.onclick = () => { el.shop.hidden = !el.shop.hidden; if (!el.shop.hidden) renderShop(); };
+    // The Shop button flips between the shop and the tank; its label says where you'll go.
+    el.shopBtn.onclick = () => {
+      el.shop.hidden = !el.shop.hidden;
+      el.shopBtn.textContent = el.shop.hidden ? 'Shop' : 'Back to tank';
+      if (!el.shop.hidden) renderShop();
+    };
     el.close.onclick = hide;
     el.min.onclick = () => {
       state.min = !state.min;

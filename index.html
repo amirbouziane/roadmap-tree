@@ -88,10 +88,11 @@
         <div class="cal-grid" id="calGrid"></div>
         <div class="cal-day" id="calDay"></div>
       </div>
+      <div class="global" id="globalView"></div>
     </section>
 
-    <aside class="next" aria-label="What's next">
-      <h2>What's next</h2>
+    <aside class="next" aria-label="This project">
+      <h2>This project</h2>
       <div id="nextList"></div>
     </aside>
   </main>
@@ -104,12 +105,14 @@
       <button type="button" id="tankClose" title="Close">×</button>
     </header>
     <div class="tank-body">
-      <canvas id="tankCanvas" width="120" height="76"></canvas>
+      <div class="tank-view">
+        <canvas id="tankCanvas" width="120" height="76"></canvas>
+        <div class="tank-shop" id="tankShop" hidden></div>
+      </div>
       <div class="tank-bar">
         <button type="button" id="feedBtn">Feed</button>
         <button type="button" id="shopBtn">Shop</button>
       </div>
-      <div class="tank-shop" id="tankShop" hidden></div>
     </div>
   </aside>
 

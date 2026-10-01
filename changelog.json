@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.3.1",
+    "date": "2026-10-01",
+    "title": "Deadline colours and parallel timers",
+    "items": [
+      { "tag": "new", "text": "Deadline colours: steps due within 5 days turn orange, overdue ones red. They show on the step, at the top of the project's sidebar, and as a dot on the project tab." },
+      { "tag": "new", "text": "Calendar tab now has an overview of all projects: which one needs attention first, and every deadline across projects in one list. Click one to jump to the step." },
+      { "tag": "improved", "text": "You can run several timers at once. Starting a new one no longer stops the others." },
+      { "tag": "fixed", "text": "Aquarium: the shop now has a Back to tank button, so you can return to your fish." }
+    ]
+  },
+  {
     "version": "0.3.0",
     "date": "2026-10-01",
     "title": "Projects, targets and an aquarium",
