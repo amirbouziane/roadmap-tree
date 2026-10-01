@@ -1,5 +1,26 @@
 [
   {
+    "version": "0.4.0",
+    "date": "2026-10-02",
+    "title": "Graph, whiteboard, planner and a jungle",
+    "items": [
+      { "tag": "new", "text": "Graph view: your steps as dots you can grab and move around, like Obsidian. Rings show overdue and due-soon steps, and [[step name]] in a note draws a dashed link." },
+      { "tag": "new", "text": "Whiteboard: a corkboard with pinned sticky notes. One per project, plus a general board shared by all projects." },
+      { "tag": "new", "text": "Calendar planner: book steps into a morning, afternoon or evening, on one day or across several. Drag blocks between slots. Missed ones get a suggested free slot you accept in one click." },
+      { "tag": "new", "text": "Library tab: save important links per project, or in a general shelf." },
+      { "tag": "new", "text": "Settings tab: light, dark or system theme, the deadline warning window, project tab order, and your companion." },
+      { "tag": "new", "text": "Project tabs sort themselves by urgency, or drag them into your own order." },
+      { "tag": "new", "text": "Aquarium: a realistic glass cube tank with an air pump, and decorations you can buy with pearls." },
+      { "tag": "new", "text": "Jungle: an alternative to the aquarium, with animals that grow. Pick one in Settings (or turn it off); pearls are shared." },
+      { "tag": "new", "text": "Share & feedback: copy the download link or a ready-made message for friends, and send ideas, bugs or praise as a pre-filled GitHub message. Nothing is sent automatically and no project data is included." },
+      { "tag": "new", "text": "Name your pets: a name box opens when you get a new one, Rename changes it later, and hovering a pet shows its name." },
+      { "tag": "improved", "text": "Feeding is hands-on: pets swim over to your mouse, and a click drops food right where you click. The Feed button is now a food bar." },
+      { "tag": "improved", "text": "The aquarium and jungle fade out their frame after 3 seconds without the mouse, so they blend into the app. Hover to bring it back (or turn this off in Settings)." },
+      { "tag": "improved", "text": "Double-click a rendered note to start editing it." },
+      { "tag": "fixed", "text": "Fixed a case where dragging could get stuck, the toolbar buttons moving under your mouse, and name boxes piling up when adding several steps quickly." }
+    ]
+  },
+  {
     "version": "0.3.1",
     "date": "2026-10-01",
     "title": "Deadline colours and parallel timers",

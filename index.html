@@ -14,6 +14,7 @@
     <span class="app-ver" id="appVer"></span>
     <button type="button" class="link" id="checkUpdate" hidden>Check for updates</button>
     <button type="button" class="link" id="whatsNewBtn">What's new</button>
+    <button type="button" class="link" id="shareBtn" title="Share the app or send feedback">Share &amp; feedback</button>
     <button type="button" class="link" id="aquariumBtn" title="Open the aquarium">Aquarium</button>
   </div>
   <nav class="projects" id="projectTabs" aria-label="Projects"></nav>
@@ -25,7 +26,11 @@
     </div>
     <nav class="tabs" aria-label="View">
       <button type="button" data-tab="tree" class="on">Tree</button>
+      <button type="button" data-tab="graph">Graph</button>
+      <button type="button" data-tab="board">Board</button>
       <button type="button" data-tab="calendar">Calendar</button>
+      <button type="button" data-tab="library">Library</button>
+      <button type="button" data-tab="settings">Settings</button>
     </nav>
     <div class="actions">
       <span id="treeActions">
@@ -36,7 +41,7 @@
       <span class="sep"></span>
       <button type="button" id="importBtn" title="Add a project from a .json file">Import…</button>
       <button type="button" id="saveAsBtn" title="Save this project as a .json file you can open elsewhere">Save as…</button>
-      <button type="button" id="discardBtn" hidden title="Drop unsaved changes and reload from disk">Discard</button>
+      <button type="button" id="discardBtn" disabled title="Drop unsaved changes and reload from disk">Discard</button>
       <button type="button" id="saveBtn" class="primary" title="Save roadmap.json (Ctrl+S)">Save</button>
     </div>
   </header>
@@ -76,6 +81,89 @@
       </div>
     </section>
 
+    <section class="graph-wrap" id="graphWrap" aria-label="Graph view" hidden>
+      <canvas id="graphCanvas"></canvas>
+      <div class="graph-hud" id="graphHud"></div>
+    </section>
+
+    <section class="board-wrap" id="boardWrap" aria-label="Whiteboard" hidden>
+      <div class="board-bar">
+        <div class="seg" id="boardScope">
+          <button type="button" data-v="project">This project</button>
+          <button type="button" data-v="general">General</button>
+        </div>
+        <button type="button" id="boardAdd">+ Note</button>
+        <span class="board-hint">Double-click the board to add a note. Drag a note by its top edge.</span>
+      </div>
+      <div class="board" id="board"></div>
+    </section>
+
+    <section class="library-wrap" id="libraryWrap" aria-label="Library" hidden>
+      <div class="library-inner" id="libraryBody"></div>
+    </section>
+
+    <section class="settings-wrap" id="settingsWrap" aria-label="Settings" hidden>
+      <h2>Settings</h2>
+
+      <div class="set-group">
+        <h3>Appearance</h3>
+        <div class="set-row">
+          <div class="set-label">Theme<small>Follow your system, or force light or dark.</small></div>
+          <div class="seg" id="setTheme">
+            <button type="button" data-v="system">System</button>
+            <button type="button" data-v="light">Light</button>
+            <button type="button" data-v="dark">Dark</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>Deadlines</h3>
+        <div class="set-row">
+          <div class="set-label">Warn when a target is within<small>Steps due this soon turn orange. Overdue ones are always red.</small></div>
+          <div class="set-num"><input type="number" id="setSoon" min="1" max="30"> days</div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>Project tabs</h3>
+        <div class="set-row">
+          <div class="set-label">Order<small>Automatic puts the most urgent project first. Dragging a tab switches to manual.</small></div>
+          <div class="seg" id="setTabOrder">
+            <button type="button" data-v="auto">Automatic</button>
+            <button type="button" data-v="manual">Manual</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>Companion</h3>
+        <div class="set-row">
+          <div class="set-label">Stress-relief box<small>Pick one habitat, or turn it off. Each keeps its own pets and food; pearls are shared, so switching never loses anything.</small></div>
+          <div class="seg" id="setCompanion">
+            <button type="button" data-v="off">Off</button>
+            <button type="button" data-v="aquarium">Aquarium</button>
+            <button type="button" data-v="jungle">Jungle</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-label">Frame<small>Fade out the title bar and buttons after 3 seconds away from the box, so it blends in. Hover over it to bring them back.</small></div>
+          <div class="seg" id="setFrame">
+            <button type="button" data-v="auto">Auto-hide</button>
+            <button type="button" data-v="always">Always show</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-group">
+        <h3>About</h3>
+        <div class="set-row">
+          <div class="set-label">Roadmap Tree <span id="setVersion"></span><small>Settings are stored on this computer only, not in your project files.</small></div>
+          <div class="set-actions"><button type="button" id="setWhatsNew">What's new</button><button type="button" id="setShare">Share &amp; feedback</button></div>
+        </div>
+      </div>
+    </section>
+
     <section class="cal-wrap" id="calWrap" aria-label="Time calendar" hidden>
       <div class="cal-head">
         <button type="button" id="calPrev" aria-label="Previous month">‹</button>
@@ -88,10 +176,11 @@
         <div class="cal-grid" id="calGrid"></div>
         <div class="cal-day" id="calDay"></div>
       </div>
+      <div class="planner" id="plannerView"></div>
       <div class="global" id="globalView"></div>
     </section>
 
-    <aside class="next" aria-label="This project">
+    <aside class="next" id="nextPane" aria-label="This project">
       <h2>This project</h2>
       <div id="nextList"></div>
     </aside>
@@ -99,7 +188,7 @@
 
   <aside class="tank" id="tank" aria-label="Aquarium" hidden>
     <header class="tank-head" id="tankHead">
-      <span class="tank-title">Aquarium</span>
+      <span class="tank-title" id="tankTitle">Aquarium</span>
       <span class="tank-pearls" title="Pearls: earn them by finishing steps and tracking time"><i class="pearl"></i><b id="tankPearls">0</b></span>
       <button type="button" id="tankMin" title="Minimize">–</button>
       <button type="button" id="tankClose" title="Close">×</button>
@@ -107,10 +196,15 @@
     <div class="tank-body">
       <div class="tank-view">
         <canvas id="tankCanvas" width="120" height="76"></canvas>
+        <div class="pet-tip" id="petTip" hidden></div>
         <div class="tank-shop" id="tankShop" hidden></div>
       </div>
       <div class="tank-bar">
-        <button type="button" id="feedBtn">Feed</button>
+        <div class="food" id="foodBar">
+          <span class="food-label">Food</span>
+          <span class="food-segs" id="foodSegs"></span>
+          <span class="food-hint" id="foodHint"></span>
+        </div>
         <button type="button" id="shopBtn">Shop</button>
       </div>
     </div>
@@ -124,6 +218,14 @@
     </div>
   </div>
 
+  <div class="modal" id="shareModal" hidden>
+    <div class="modal-card share-card" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+      <h2 id="shTitle">Share &amp; feedback</h2>
+      <div class="share-body" id="shareBody"></div>
+      <div class="modal-actions"><button type="button" class="primary" id="shareClose">Done</button></div>
+    </div>
+  </div>
+
   <div class="tip" id="tip" role="tooltip" hidden></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -132,6 +234,11 @@
   <script src="vendor/katex.min.js"></script>
   <script src="markdown.js"></script>
   <script src="aquarium.js"></script>
+  <script src="library.js"></script>
+  <script src="board.js"></script>
+  <script src="graph.js"></script>
+  <script src="planner.js"></script>
+  <script src="share.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

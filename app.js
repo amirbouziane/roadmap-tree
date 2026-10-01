@@ -131,6 +131,9 @@ function normalize(data) {
     tree.log = data.log.filter((e) => e && typeof e.node === 'string' && e.start < e.end)
       .map((e) => ({ id: e.id || newLogId(), node: e.node, label: String(e.label ?? ''), start: +e.start, end: +e.end }));
   }
+  tree.links = cleanLinks(data.links);   // Library: saved links
+  tree.board = cleanBoard(data.board);   // Whiteboard: pinned notes
+  tree.blocks = cleanBlocks(data.blocks); // Calendar planner: steps booked into day slots
   const seen = new Set();
   walk(tree.nodes, (n) => {
     n.label = String(n.label ?? '');
@@ -143,11 +146,68 @@ function normalize(data) {
 }
 
 const newProjectId = () => 'p' + Math.random().toString(36).slice(2, 8);
+const newSmallId = (prefix) => prefix + Math.random().toString(36).slice(2, 9);
+
+/**
+ * Make a web address safe to open: add https:// when no scheme is given and
+ * allow only http(s) and mailto, so a saved link can never be a script.
+ * Returns '' for anything unusable.
+ */
+function cleanUrl(u) {
+  u = String(u || '').trim();
+  if (!u) return '';
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u;
+  return /^(https?:\/\/|mailto:)/i.test(u) ? u : '';
+}
+
+/** Saved links: [{ id, title, url, note }]; entries without a usable URL are dropped. */
+function cleanLinks(a) {
+  if (!Array.isArray(a)) return [];
+  return a.filter((l) => l && typeof l === 'object')
+    .map((l) => ({ id: String(l.id || newSmallId('l')), title: String(l.title || '').slice(0, 200), url: cleanUrl(l.url), note: String(l.note || '').slice(0, 500) }))
+    .filter((l) => l.url);
+}
+
+const NOTE_COLORS = ['yellow', 'pink', 'blue', 'green', 'orange'];
+
+/** Whiteboard: { notes: [{ id, x, y, w, h, c, r, z, t }] } with numbers clamped to sensible values. */
+function cleanBoard(b) {
+  const notes = b && Array.isArray(b.notes) ? b.notes : [];
+  return {
+    notes: notes.filter((n) => n && typeof n === 'object').map((n, i) => ({
+      id: String(n.id || newSmallId('b')),
+      x: Math.max(0, Number(n.x) || 0), y: Math.max(0, Number(n.y) || 0),
+      w: Math.min(600, Math.max(120, Number(n.w) || 180)), h: Math.min(600, Math.max(90, Number(n.h) || 140)),
+      c: NOTE_COLORS.includes(n.c) ? n.c : 'yellow',
+      r: Math.max(-6, Math.min(6, Number(n.r) || 0)),
+      z: Number.isFinite(Number(n.z)) ? Number(n.z) : i,
+      t: String(n.t || '').slice(0, 5000),
+    })),
+  };
+}
+
+const SLOTS = [
+  { id: 'am', label: 'Morning', from: 0, to: 12 },
+  { id: 'pm', label: 'Afternoon', from: 12, to: 18 },
+  { id: 'eve', label: 'Evening', from: 18, to: 24 },
+];
+
+/** Planner blocks: [{ id, node, day: 'YYYY-MM-DD', slot: 'am'|'pm'|'eve', done }]. */
+function cleanBlocks(a) {
+  if (!Array.isArray(a)) return [];
+  return a.filter((b) => b && typeof b.node === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.day) && SLOTS.some((s) => s.id === b.slot))
+    .map((b) => ({ id: String(b.id || newSmallId('k')), node: b.node, day: b.day, slot: b.slot, done: !!b.done }));
+}
+
+/** The "general" area shared by all projects: its own links and whiteboard. */
+function cleanGeneral(g) {
+  return { links: cleanLinks(g && g.links), board: cleanBoard(g && g.board) };
+}
 
 /**
  * Load a file's contents as a set of projects. Accepts either a single
  * project ({ title, nodes, log }) or a workspace
- * ({ projects: [...], active: id }). Returns { projects, active }.
+ * ({ projects: [...], active: id, general }). Returns { projects, active, general }.
  */
 function normalizeWorkspace(data) {
   const list = data && Array.isArray(data.projects) ? data.projects : [data];
@@ -159,7 +219,7 @@ function normalizeWorkspace(data) {
     ids.add(p.id);
   }
   const active = projects.find((p) => p.id === (data && data.active)) || projects[0];
-  return { projects, active };
+  return { projects, active, general: cleanGeneral(data && data.projects ? data.general : null) };
 }
 
 /** Map of 'YYYY-MM-DD' -> nodes whose target date is that day. */
@@ -176,7 +236,7 @@ function fmtDue(key) {
 
 /* ---- deadlines: how urgent is each step's target date? ---- */
 
-const SOON_DAYS = 5; // a target within this many days counts as "soon" (orange)
+let SOON_DAYS = 5; // a target within this many days counts as "soon" (orange); changed in Settings
 const LEVEL_RANK = { overdue: 3, soon: 2, later: 1, done: 0 };
 
 /** Whole days from `today` to `due` (both 'YYYY-MM-DD'); negative once it has passed. */
@@ -600,6 +660,9 @@ const now = new Date();
 const state = {
   projects: [],     // every project (each is a tree: { id, title, nodes, log })
   tree: null,       // the active project, one of `projects`
+  general: { links: [], board: { notes: [] } }, // shared by all projects: general links and whiteboard
+  libScope: 'project', // Library tab: 'project' | 'general'
+  boardScope: 'project', // Whiteboard tab: 'project' | 'general'
   collapsed: new Set(),
   dirty: false,
   fileHandle: null, // File System Access handle, once the user saves to a chosen file (browser only)
@@ -616,8 +679,42 @@ const store = {
   del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
 };
 
+/* ---- settings: stored on this computer only, never in project files ---- */
+
+const SETTINGS_KEY = 'roadmap-tree:settings';
+const settings = { theme: 'system', soonDays: 5, tabOrder: 'auto', companion: 'aquarium', companionFrame: 'auto' };
+try { Object.assign(settings, JSON.parse(store.get(SETTINGS_KEY) || '{}')); } catch { /* use defaults */ }
+
+function saveSettings() { store.set(SETTINGS_KEY, JSON.stringify(settings)); }
+
+/** Push the settings into the page: theme, deadline threshold, companion visibility. */
+function applySettings() {
+  const root = document.documentElement;
+  if (settings.theme === 'light' || settings.theme === 'dark') root.dataset.theme = settings.theme;
+  else delete root.dataset.theme; // "system": let the OS decide
+  SOON_DAYS = Math.min(30, Math.max(1, Math.round(Number(settings.soonDays)) || 5));
+  if (!['off', 'aquarium', 'jungle'].includes(settings.companion)) settings.companion = 'aquarium';
+  $('aquariumBtn').hidden = settings.companion === 'off';
+  Aquarium.setCompanion(settings.companion);
+  Aquarium.setAutoHide(settings.companionFrame !== 'always');
+}
+
+/** Project tabs in display order: most urgent first (automatic), or exactly as stored (manual). */
+function orderedProjects() {
+  if (settings.tabOrder === 'manual') return state.projects;
+  const today = dayKey(Date.now());
+  return state.projects
+    .map((p, i) => {
+      const d = deadlines(p, today);
+      return { p, i, rank: d.length ? LEVEL_RANK[d[0].level] : 0, days: d.length ? d[0].days : 1e9 };
+    })
+    .sort((a, b) => b.rank - a.rank || a.days - b.days || a.i - b.i)
+    .map((x) => x.p);
+}
+
 /** Startup: prefer an unsaved local draft, otherwise fetch roadmap.json. */
 async function init() {
+  applySettings();
   try { state.collapsed = new Set(JSON.parse(store.get(VIEW_KEY) || '[]')); } catch { /* ignore */ }
   try {
     const saved = JSON.parse(store.get(TIMER_KEY) || 'null');
@@ -637,25 +734,33 @@ async function init() {
   state.timers.forEach((t) => { if (!t.projectId) t.projectId = state.tree.id; }); // timers from older versions
   bindEvents();
   update();
+  // A gentle heads-up about planned slots that went by unfinished (details are in the Calendar tab).
+  setTimeout(() => {
+    const m = Planner.missedCount();
+    if (m) toast(`${m} planned block${m > 1 ? 's' : ''} missed. Open the Calendar to reschedule.`);
+  }, 3200);
 }
 
 /** Make `{ projects, active }` (from normalizeWorkspace) the current state. */
 function setWorkspace(ws) {
   state.projects = ws.projects;
   state.tree = ws.active;
+  state.general = ws.general || cleanGeneral(null);
   state.selected = null;
 }
 
-/** What gets written to disk: a lone project as-is (opens anywhere), several as a workspace. */
+const generalHasData = () => state.general.links.length > 0 || state.general.board.notes.length > 0;
+
+/** What gets written to disk: a lone project as-is (opens anywhere), otherwise a workspace. */
 function fileDoc() {
-  return state.projects.length === 1
+  return state.projects.length === 1 && !generalHasData()
     ? state.projects[0]
-    : { version: 2, active: state.tree.id, projects: state.projects };
+    : { version: 2, active: state.tree.id, projects: state.projects, general: state.general };
 }
 
 /** What the localStorage draft holds: always the whole workspace. */
 function draftDoc() {
-  return { version: 2, active: state.tree.id, projects: state.projects };
+  return { version: 2, active: state.tree.id, projects: state.projects, general: state.general };
 }
 
 /** Load the tree from the open file handle, or fetch ./roadmap.json. */
@@ -693,12 +798,17 @@ function update() {
   $('emptyState').hidden = tree.nodes.length > 0 || !$('loadError').hidden;
 
   // Tabs: only the active view is shown; tree-only buttons hide on the calendar.
-  const cal = state.tab === 'calendar';
-  $('treeWrap').hidden = cal;
-  $('calWrap').hidden = !cal;
-  $('treeActions').hidden = cal;
-  document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === state.tab));
-  if (cal) renderCal();
+  const tab = state.tab;
+  const panes = { tree: 'treeWrap', graph: 'graphWrap', board: 'boardWrap', calendar: 'calWrap', library: 'libraryWrap', settings: 'settingsWrap' };
+  for (const [name, id] of Object.entries(panes)) $(id).hidden = tab !== name;
+  $('nextPane').hidden = !(tab === 'tree' || tab === 'calendar'); // the other views use the whole window
+  $('treeActions').hidden = tab !== 'tree';
+  document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+  if (tab === 'calendar') renderCal();
+  if (tab === 'settings') renderSettings();
+  if (tab === 'library') Library.render();
+  if (tab === 'board') Board.render(); // board interactions don't call update(), so typing is never interrupted
+  if (tab === 'graph') Graph.show(); else Graph.hide();
   tickTimer();
   refreshTip();
 
@@ -716,11 +826,22 @@ function update() {
   Aquarium.trackedTime(tracked);
 }
 
+/** Highlight the current choices on the Settings page. */
+function renderSettings() {
+  for (const [id, key] of [['setTheme', 'theme'], ['setTabOrder', 'tabOrder'], ['setCompanion', 'companion'], ['setFrame', 'companionFrame']]) {
+    $(id).querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.v === settings[key]));
+  }
+  if (document.activeElement !== $('setSoon')) $('setSoon').value = settings.soonDays;
+  $('setVersion').textContent = appVersion ? `v${appVersion}` : '(web)';
+}
+
 /** Save button shows a dot (and Discard appears) while there are unsaved changes. */
 function updateSaveState() {
   $('saveBtn').classList.toggle('dirty', state.dirty);
   $('saveBtn').textContent = state.dirty ? 'Save •' : 'Save';
-  $('discardBtn').hidden = !state.dirty;
+  // Discard keeps its space while hidden so the other buttons never jump under the cursor.
+  $('discardBtn').disabled = !state.dirty;
+  $('discardBtn').style.visibility = state.dirty ? 'visible' : 'hidden';
 }
 
 /* ---- step notes ---- */
@@ -783,6 +904,7 @@ function renderCal() {
   $('calGrid').innerHTML = renderCalendar(state.tree, { year, month, selected, today: dayKey(Date.now()) });
   $('calDay').innerHTML = renderDay(state.tree, selected);
   $('globalView').innerHTML = renderGlobal(state.projects, dayKey(Date.now()), state.tree.id);
+  Planner.render();
 }
 
 /** Jump to a step in any project: switch tab and project, expand its branch, and flash it. */
@@ -900,9 +1022,10 @@ function renderNext(tree) {
   const item = ({ node, path }) =>
     `<li data-id="${esc(node.id)}"><span class="mini-dot s-${statusOf(node)}"></span>`
     + `<span>${esc(node.label)}${path.length || node.due ? `<span class="crumb">${esc(path.join(' / '))}${node.due ? `${path.length ? ' · ' : ''}target ${esc(fmtDue(node.due))}` : ''}</span>` : ''}</span></li>`;
-  // Deadlines go first: overdue (red) and due-soon (orange) steps float to the top.
+  // Today's plan (booked slots), then deadlines: overdue (red) and due-soon (orange) steps float to the top.
   const dl = deadlines(tree, dayKey(Date.now())).slice(0, 8);
-  let html = '<h3>Deadlines</h3>';
+  let html = Planner.todayHtml(tree);
+  html += '<h3>Deadlines</h3>';
   html += dl.length
     ? '<ul class="dl">' + dl.map((d) =>
       `<li class="lvl-${d.level}" data-id="${esc(d.node.id)}"><span class="dl-bar"></span>`
@@ -933,7 +1056,7 @@ function markDirty() {
 /** Draw the project tabs; a green dot marks the project with a running timer. */
 function renderTabs() {
   const today = dayKey(Date.now());
-  $('projectTabs').innerHTML = state.projects.map((p) => {
+  $('projectTabs').innerHTML = orderedProjects().map((p) => {
     const d = deadlines(p, today);
     const lvl = d.length ? d[0].level : null; // worst unfinished deadline
     return `<button type="button" class="ptab${p.id === state.tree.id ? ' on' : ''}" data-pid="${esc(p.id)}" title="Double-click to rename">`
@@ -943,6 +1066,84 @@ function renderTabs() {
     + `<span class="pclose" data-close="${esc(p.id)}" title="Delete this project">×</span></button>`;
   }).join('')
     + '<button type="button" class="ptab-add" id="addProject" title="New project">+</button>';
+}
+
+let cancelTabDrag = null; // ends the tab drag in progress, if any
+
+/**
+ * Drag a project tab left or right. Dropping on the left or right half of
+ * another tab puts it before or after it. Doing this switches the tab order
+ * to manual, starting from the order you were looking at.
+ */
+function startTabDrag(e, pid) {
+  const bar = $('projectTabs');
+  const x0 = e.clientX;
+  let active = false;
+  let drop = null; // { id, side }
+  const tabs = () => [...bar.querySelectorAll('.ptab')];
+  const clearMarks = () => tabs().forEach((t) => t.classList.remove('drop-before', 'drop-after'));
+
+  const onMove = (ev) => {
+    if (!active) {
+      if (Math.abs(ev.clientX - x0) < 6) return; // still just a click
+      active = true;
+      const src = bar.querySelector(`.ptab[data-pid="${CSS.escape(pid)}"]`);
+      if (src) src.classList.add('dragging');
+      document.body.classList.add('is-dragging');
+    }
+    clearMarks();
+    drop = null;
+    for (const t of tabs()) {
+      const r = t.getBoundingClientRect();
+      if (ev.clientX < r.left || ev.clientX >= r.right) continue;
+      if (t.dataset.pid === pid) break;
+      const side = ev.clientX < r.left + r.width / 2 ? 'before' : 'after';
+      t.classList.add('drop-' + side);
+      drop = { id: t.dataset.pid, side };
+      break;
+    }
+  };
+
+  const end = (keep) => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onCancel);
+    document.removeEventListener('keydown', onKey);
+    window.removeEventListener('blur', onCancel);
+    if (cancelTabDrag === onCancel) cancelTabDrag = null;
+    if (!active) return; // never moved: let the click switch tabs
+    clearMarks();
+    tabs().forEach((t) => t.classList.remove('dragging'));
+    document.body.classList.remove('is-dragging');
+    const swallow = (ev) => ev.stopPropagation(); // the click after a drop shouldn't switch tabs
+    document.addEventListener('click', swallow, true);
+    setTimeout(() => document.removeEventListener('click', swallow, true), 60);
+    if (!keep || !drop) return;
+
+    state.projects = orderedProjects().slice(); // freeze the order currently on screen
+    const from = state.projects.findIndex((p) => p.id === pid);
+    const [moved] = state.projects.splice(from, 1);
+    let to = state.projects.findIndex((p) => p.id === drop.id);
+    if (drop.side === 'after') to++;
+    state.projects.splice(to, 0, moved);
+    if (settings.tabOrder !== 'manual') {
+      settings.tabOrder = 'manual';
+      saveSettings();
+      toast('Tabs are now in manual order. You can change this in Settings.');
+    }
+    markDirty();
+    update();
+  };
+  const onUp = () => end(true);
+  const onCancel = () => end(false);
+  const onKey = (ev) => { if (ev.key === 'Escape') end(false); };
+  if (cancelTabDrag) cancelTabDrag();
+  cancelTabDrag = onCancel;
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onCancel);
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('blur', onCancel);
 }
 
 function switchProject(id) {
@@ -955,7 +1156,7 @@ function switchProject(id) {
 
 /** New empty project; its title opens for renaming straight away. */
 function addProject() {
-  const p = { id: newProjectId(), title: `Project ${state.projects.length + 1}`, nodes: [], log: [] };
+  const p = normalize({ title: `Project ${state.projects.length + 1}`, nodes: [] });
   state.projects.push(p);
   state.tree = p;
   state.selected = null;
@@ -1118,7 +1319,10 @@ function startDrag(e, srcId, immediate) {
   const end = (keep) => {
     document.removeEventListener('pointermove', onMove);
     document.removeEventListener('pointerup', onUp);
+    document.removeEventListener('pointercancel', onCancel);
     document.removeEventListener('keydown', onKey);
+    window.removeEventListener('blur', onCancel);
+    if (cancelDrag === onCancel) cancelDrag = null;
     if (!active) return; // never moved: let the click through
     ind.remove();
     srcG.classList.remove('dragging');
@@ -1133,11 +1337,20 @@ function startDrag(e, srcId, immediate) {
     commit((tree) => { moveNode(tree, srcId, id, pos); });
   };
   const onUp = () => end(true);
+  // The browser can cancel a press (focus change, native drag, touch scroll) without a pointerup;
+  // without this the row would stay faded and the drag would never finish.
+  const onCancel = () => end(false);
   const onKey = (ev) => { if (ev.key === 'Escape') end(false); };
+  if (cancelDrag) cancelDrag(); // never run two drags at once
+  cancelDrag = onCancel;
   document.addEventListener('pointermove', onMove);
   document.addEventListener('pointerup', onUp);
+  document.addEventListener('pointercancel', onCancel);
   document.addEventListener('keydown', onKey);
+  window.addEventListener('blur', onCancel);
 }
+
+let cancelDrag = null; // ends the drag in progress, if any
 
 function onTreeDblClick(e) {
   if (!e.target.closest('[data-action="label"]')) return;
@@ -1148,6 +1361,7 @@ function onTreeDblClick(e) {
 
 /** Overlay an <input> on a label to rename it. Enter/blur saves, Esc cancels. */
 function startRename(id, selectAll = false) {
+  if (finishRename) finishRename(true); // only one name box at a time: close (and save) the previous one
   const wrap = $('treeWrap');
   const g = wrap.querySelector(`.rt-node[data-id="${CSS.escape(id)}"]`);
   const hit = findNode(state.tree, id);
@@ -1170,16 +1384,20 @@ function startRename(id, selectAll = false) {
   const finish = (keep) => {
     if (done) return;
     done = true;
+    if (finishRename === finish) finishRename = null;
     const v = input.value.trim();
     input.remove();
     if (keep && v && v !== hit.node.label) commit(() => { hit.node.label = v; });
   };
+  finishRename = finish;
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter') finish(true);
     else if (ev.key === 'Escape') finish(false);
   });
   input.addEventListener('blur', () => finish(true));
 }
+
+let finishRename = null; // closes the open name box, if any
 
 const JSON_TYPES = [{ description: 'Roadmap JSON', accept: { 'application/json': ['.json'] } }];
 
@@ -1428,6 +1646,54 @@ function bindEvents() {
     if (state.noteMode === 'edit') $('noteText').focus();
   };
   $('noteClose').onclick = closeNote;
+  // Double-click the rendered text to start editing, with the caret on the word you clicked if we can find it.
+  $('noteView').addEventListener('dblclick', () => {
+    if (state.noteMode === 'edit') return;
+    const word = String(getSelection()).trim();
+    const hit = findNode(state.tree, state.selected);
+    if (!hit) return;
+    state.noteMode = 'edit';
+    update();
+    const ta = $('noteText');
+    ta.focus();
+    const md = hit.node.md || '';
+    const i = word ? md.indexOf(word) : -1;
+    if (i >= 0) {
+      ta.setSelectionRange(i, i + word.length);
+      ta.scrollTop = Math.max(0, (md.slice(0, i).split('\n').length - 3) * 21);
+    } else ta.setSelectionRange(md.length, md.length);
+  });
+
+  // Settings page.
+  for (const [id, key] of [['setTheme', 'theme'], ['setTabOrder', 'tabOrder'], ['setCompanion', 'companion'], ['setFrame', 'companionFrame']]) {
+    $(id).addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]');
+      if (!b) return;
+      // Going manual keeps the order you currently see.
+      if (key === 'tabOrder' && b.dataset.v === 'manual' && settings.tabOrder !== 'manual') {
+        state.projects = orderedProjects().slice();
+        markDirty();
+      }
+      settings[key] = b.dataset.v;
+      saveSettings();
+      applySettings();
+      update();
+    });
+  }
+  $('setSoon').addEventListener('change', () => {
+    const n = Math.round(Number($('setSoon').value));
+    settings.soonDays = n >= 1 && n <= 30 ? n : 5;
+    saveSettings();
+    applySettings();
+    update();
+  });
+  $('setWhatsNew').onclick = () => $('whatsNewBtn').click();
+
+  Library.init();
+  Board.init();
+  Graph.init();
+  Planner.init();
+  Share.init();
   let previewTimer = null;
   $('noteText').addEventListener('input', () => {
     const hit = findNode(state.tree, state.selected);
@@ -1457,6 +1723,11 @@ function bindEvents() {
     if (e.target.closest('#addProject')) { addProject(); return; }
     const tab = e.target.closest('[data-pid]');
     if (tab) switchProject(tab.dataset.pid);
+  });
+  $('projectTabs').addEventListener('pointerdown', (e) => {
+    const tab = e.target.closest('.ptab');
+    if (!tab || e.button !== 0 || e.target.closest('[data-close]')) return;
+    startTabDrag(e, tab.dataset.pid);
   });
   $('projectTabs').addEventListener('dblclick', (e) => {
     if (!e.target.closest('[data-close]') && e.target.closest('[data-pid]')) startTitleEdit();
@@ -1518,7 +1789,7 @@ function bindEvents() {
   };
   Aquarium.init({
     toast,
-    onChange: (n) => { $('aquariumBtn').textContent = n > 0 ? `Aquarium (${n} ●)` : 'Aquarium'; },
+    onChange: (n, title) => { $('aquariumBtn').textContent = n > 0 ? `${title} (${n} ●)` : title; },
   });
   $('aquariumBtn').onclick = () => Aquarium.toggle();
 
